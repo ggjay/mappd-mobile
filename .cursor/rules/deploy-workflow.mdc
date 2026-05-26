@@ -15,7 +15,9 @@ alwaysApply: true
 2. `git commit`（简洁说明 why）
 3. `git push origin main`
 
-若尚未创建远程仓库，先提示用户在 GitHub 新建 `mappd-mobile` 并 `git remote add origin`，**不要**推送到 `ggjay/mappd`。
+仓库：`https://github.com/ggjay/mappd-mobile.git`
+
+**不要**推送到 `ggjay/mappd` 主项目。
 
 ## Vercel
 
