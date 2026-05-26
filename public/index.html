@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Mappd Mobile — J人自由行时序决策沙盘</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F4F0E8; --surface: #FDFBF7; --surface2: #EFECE6;
+    --ink: #1A1814; --ink2: #6B6860; --ink3: #9E9B94;
+    --accent: #4A5B4E; --accent-light: #E2E7E3; --accent2: #B56545;
+    --border: rgba(26,24,20,0.08); --border2: rgba(26,24,20,0.04);
+    --radius: 12px; --radius-sm: 8px;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.6; }
+
+  /* —— 欢迎页 —— */
+  .page-welcome {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 32px 20px; background: radial-gradient(ellipse at 30% 20%, #FDFBF7 0%, var(--bg) 55%);
+  }
+  .welcome-card {
+    width: 100%; max-width: 440px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 36px 32px 28px; box-shadow: 0 12px 40px rgba(26,24,20,0.06);
+  }
+  .welcome-title {
+    font-family: 'DM Serif Display', serif; font-size: 26px; line-height: 1.35;
+    color: var(--ink); text-align: center; margin-bottom: 28px; letter-spacing: -0.3px;
+  }
+  .welcome-logo { display: flex; justify-content: center; margin-bottom: 16px; }
+  .welcome-logo .logo-mark {
+    width: 40px; height: 40px; background: var(--ink); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .welcome-logo .logo-mark i { color: var(--surface); font-size: 20px; }
+
+  /* —— 结果页：双方案详情卡片 —— */
+  .page-results { display: none; grid-template-columns: minmax(420px, 50%) 1fr; height: 100vh; overflow: hidden; }
+  .page-results.active { display: grid; }
+
+  .panel { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .panel-top { padding: 14px 20px; flex-shrink: 0; border-bottom: 1px solid var(--border2); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .panel-top-title { font-family: 'DM Serif Display', serif; font-size: 17px; line-height: 1.3; }
+  .panel-top-sub { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+  .back-link { font-size: 12px; color: var(--ink2); cursor: pointer; background: none; border: none; font-family: inherit; display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .back-link:hover { color: var(--accent2); }
+
+  .input-group { margin-bottom: 10px; }
+  .input-label { font-size: 11px; font-weight: 500; color: var(--ink2); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; display: block; }
+  .input-field { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 12px; font-family: var(--font-body); font-size: 13px; color: var(--ink); outline: none; }
+  .input-field:focus { border-color: var(--accent); }
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .pref-tags { display: flex; gap: 8px; margin-top: 4px; }
+  .pref-tag { flex: 1; text-align: center; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink2); transition: all 0.2s; }
+  .pref-tag.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .style-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .style-tag { flex: 1 1 calc(33.33% - 6px); min-width: 0; text-align: center; padding: 7px 4px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; color: var(--ink2); transition: all 0.2s; user-select: none; }
+  .style-tag.selected { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .input-hint { font-size: 10px; color: var(--ink3); margin-top: 4px; }
+
+  .gen-btn { width: 100%; padding: 13px; background: var(--ink); color: var(--surface); border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; transition: background 0.2s; }
+  .gen-btn:hover:not(:disabled) { background: var(--accent); }
+  .gen-btn:disabled { background: var(--ink3); cursor: not-allowed; }
+  .gen-btn .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+  .gen-btn.loading .spinner { display: block; }
+  .gen-btn.loading .btn-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .results-scroll { flex: 1; overflow-y: auto; padding: 14px 16px 20px; scroll-behavior: smooth; }
+  .results-scroll::-webkit-scrollbar { width: 4px; }
+  .results-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .plan-cards-stack { display: flex; flex-direction: column; gap: 14px; }
+
+  .plan-detail-card {
+    background: #fff; border: 2px solid var(--border); border-radius: var(--radius);
+    padding: 18px 18px 16px; cursor: pointer; transition: all 0.22s; position: relative;
+  }
+  .plan-detail-card:hover { border-color: rgba(74,91,78,0.35); }
+  .plan-detail-card.selected {
+    border-color: var(--accent); background: linear-gradient(180deg, #fff 0%, var(--accent-light) 100%);
+    box-shadow: 0 8px 28px rgba(74,91,78,0.14);
+  }
+  .plan-detail-card:not(.selected) { opacity: 0.78; }
+  .plan-detail-card:not(.selected):hover { opacity: 0.95; }
+
+  .detail-card-top {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    margin-bottom: 10px; padding-right: 28px;
+  }
+  .detail-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--accent);
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .plan-detail-card.selected .detail-badge { color: var(--ink); }
+  .detail-headline {
+    font-family: 'DM Serif Display', serif; font-size: 19px; font-weight: 600;
+    color: var(--ink); line-height: 1.3;
+  }
+  .detail-price {
+    font-size: 13px; font-weight: 700; color: var(--accent2); white-space: nowrap;
+    background: rgba(181,101,69,0.08); padding: 6px 10px; border-radius: 6px;
+  }
+  .detail-check {
+    position: absolute; top: 16px; right: 16px; width: 22px; height: 22px;
+    border: 2px solid var(--border); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: transparent; transition: all 0.2s;
+  }
+  .plan-detail-card.selected .detail-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .detail-viewing {
+    display: none; font-size: 10px; font-weight: 700; color: #fff; background: var(--accent);
+    padding: 2px 8px; border-radius: 4px; margin-left: 8px; vertical-align: middle;
+  }
+  .plan-detail-card.selected .detail-viewing { display: inline-block; }
+
+  .detail-diff {
+    font-size: 11px; color: var(--accent2); background: rgba(181,101,69,0.07);
+    padding: 8px 10px; border-radius: 6px; line-height: 1.45; margin-bottom: 12px;
+    border-left: 3px solid var(--accent2);
+  }
+  .detail-route {
+    font-size: 12px; font-weight: 600; color: var(--ink2); margin-bottom: 12px;
+    padding: 8px 10px; background: var(--bg); border-radius: 6px;
+  }
+  .detail-section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--ink3);
+    letter-spacing: 0.6px; margin-bottom: 6px; margin-top: 12px;
+  }
+  .detail-logic {
+    font-size: 12px; color: var(--ink); line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .detail-nodes { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .detail-node {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--bg); border-radius: 6px; padding: 7px 10px; font-size: 12px;
+  }
+  .detail-node-city { font-weight: 600; }
+  .detail-node-nights { font-size: 10px; background: var(--ink); color: #fff; padding: 2px 6px; border-radius: 8px; font-weight: 700; }
+  .detail-cost-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border2);
+    font-size: 12px;
+  }
+  .detail-cost-total { font-weight: 700; font-size: 14px; color: var(--accent2); }
+  .detail-alert {
+    margin-top: 10px; font-size: 11px; color: #C53030; background: #FFF5F5;
+    border: 1px solid #FEB2B2; padding: 8px 10px; border-radius: 6px; line-height: 1.4;
+  }
+
+  .manifest-headline { font-family: 'DM Serif Display', serif; font-size: 20px; font-weight: 600; color: var(--ink); line-height: 1.3; margin-bottom: 10px; }
+  .tag-capsule-container { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .tag-capsule { background: var(--bg); color: var(--ink2); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .logic-callout-box { background: rgba(181,101,69,0.04); border-left: 3px solid var(--accent2); padding: 12px; border-radius: 0 8px 8px 0; font-size: 12px; color: var(--ink); line-height: 1.5; margin-bottom: 18px; }
+  .section-subtitle { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--ink3); letter-spacing: 0.8px; margin-bottom: 8px; margin-top: 16px; display: flex; align-items: center; gap: 6px; }
+  .node-timeline-item { background: var(--bg); border: 1px solid var(--border2); padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .node-city { font-weight: 600; font-size: 13px; color: var(--ink); }
+  .node-nights { background: var(--ink); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 700; }
+  .finance-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+  .finance-table td { padding: 6px 0; border-bottom: 1px dashed var(--border2); }
+  .finance-price-val { text-align: right; font-weight: 600; color: var(--accent); }
+  .season-alert-banner { background: #FFF5F5; border: 1px solid #FEB2B2; color: #C53030; padding: 10px 14px; border-radius: 8px; font-size: 11px; line-height: 1.4; margin-top: 14px; font-weight: 500; }
+
+  .map-container { position: relative; background: #E8E2D5; height: 100vh; }
+  #map { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 1; background: #E8E2D5; }
+  .map-top-navigation-bar {
+    position: absolute; top: 16px; left: 16px; right: 16px;
+    background: #fff; border: 1px solid var(--border); padding: 8px 10px;
+    border-radius: var(--radius); z-index: 10; box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    display: none;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .map-top-navigation-bar.active { display: flex; }
+  .map-top-navigation-bar::-webkit-scrollbar { height: 4px; }
+  .map-nav-tab {
+    flex: 0 0 auto;
+    padding: 8px 14px; font-size: 12px; font-weight: 600; color: var(--ink2);
+    border-radius: 6px; cursor: pointer; white-space: nowrap; transition: all 0.2s;
+    background: var(--bg); border: none; font-family: inherit;
+  }
+  .map-nav-tab.active { background: var(--ink); color: #fff; }
+  .map-floating-micro-pane {
+    position: absolute; top: 85px; right: 20px; width: 350px; max-height: calc(100vh - 170px);
+    background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+    z-index: 10; box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 16px;
+    display: none; flex-direction: column; overflow-y: auto;
+  }
+  .map-floating-micro-pane.active { display: flex; }
+  .micro-pane-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 12px; border-bottom: 1px dashed var(--border2); padding-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .micro-detail-item { background: var(--bg); border: 1px solid var(--border2); padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 12px; }
+  .map-placeholder {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(circle at center, #FDFBF7 0%, #E8E2D5 100%); z-index: 5; padding: 40px; text-align: center;
+  }
+  .guide-title { font-family: 'DM Serif Display', serif; font-size: 32px; color: var(--ink); margin-bottom: 8px; }
+  .guide-subtitle { font-size: 15px; color: var(--ink2); font-weight: 500; }
+
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(253,251,247,0.92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  .loading-overlay.active { opacity: 1; pointer-events: all; }
+  .loading-title { font-size: 20px; font-weight: 500; color: var(--ink); margin-top: 16px; }
+
+  /* 地图融合动线标注 */
+  .map-label-icon { background: transparent !important; border: none !important; }
+  .route-node-pin {
+    width: 30px; height: 30px; background: var(--ink); color: #fff; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+    border: 2.5px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  }
+  .route-node-pin.is-first { background: var(--accent2); }
+  .route-node-pin.is-last { background: var(--accent); }
+  .route-node-pin { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+  .route-node-pin.is-active { transform: scale(1.12); box-shadow: 0 0 0 3px rgba(74,91,78,0.35); }
+  .seg-mid-pin {
+    width: 22px; height: 22px; background: #fff; color: var(--accent); border-radius: 50%;
+    border: 2px solid var(--accent); display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .seg-mid-pin.is-active { transform: scale(1.15); box-shadow: 0 0 0 3px rgba(74,91,78,0.35); }
+  .map-anno-wrap { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .map-anno-card {
+    background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 11px; line-height: 1.45;
+    border: 1px solid var(--border2); width: 100%; box-sizing: border-box;
+    white-space: normal; word-break: break-word;
+  }
+  .map-anno-card .anno-title { font-weight: 700; font-size: 10px; color: var(--ink); margin-bottom: 2px; }
+  .map-anno-card .anno-meta { color: var(--ink2); font-size: 9px; }
+  .map-anno-flight { border-left: 3px solid #3B82F6; }
+  .map-anno-stay { border-left: 3px solid var(--accent2); }
+  .map-anno-segment {
+    border-left: 3px solid var(--accent); text-align: center;
+    background: rgba(74,91,78,0.06);
+  }
+  .map-flow-arrow {
+    color: var(--accent); font-size: 20px; font-weight: 700; text-shadow: 0 0 3px #fff;
+    line-height: 1; display: block;
+  }
+
+  .map-bottom-strip {
+    position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 22;
+    display: none; gap: 10px; overflow-x: auto; overflow-y: hidden;
+    padding: 10px 12px; scroll-behavior: smooth;
+    background: rgba(253, 251, 247, 0.96); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: 0 -4px 24px rgba(0,0,0,0.1);
+    -webkit-overflow-scrolling: touch;
+  }
+  .map-bottom-strip.active { display: flex; }
+  .map-bottom-strip::-webkit-scrollbar { height: 5px; }
+  .map-bottom-strip::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .map-strip-card {
+    flex: 0 0 auto; width: 168px; aspect-ratio: 4 / 3;
+    background: #fff; border: 2px solid var(--border); border-radius: 10px;
+    padding: 10px 11px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .map-strip-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+  .map-strip-card.active {
+    border-color: var(--accent); background: var(--accent-light);
+    box-shadow: 0 0 0 3px rgba(74, 91, 78, 0.25);
+  }
+  .map-strip-card.strip-node { border-left: 4px solid var(--ink); }
+  .map-strip-card.strip-segment { border-left: 4px solid var(--accent); }
+  .map-strip-card.strip-stay { border-left: 4px solid var(--accent2); }
+  .map-strip-card.strip-attraction { border-left: 4px solid #5B4E8A; }
+  .map-strip-card.strip-meal { border-left: 4px solid #E67E22; }
+  .strip-type { font-size: 9px; font-weight: 700; color: var(--ink3); letter-spacing: 0.5px; flex-shrink: 0; }
+  .strip-title {
+    font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.3; margin: 4px 0;
+    flex-shrink: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .strip-body {
+    font-size: 10px; color: var(--ink2); line-height: 1.45; flex: 1; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+  }
+
+  .map-detail-sheet {
+    position: absolute; top: 0; right: 0; width: 380px; max-width: 92vw; height: 100%;
+    background: var(--surface); border-left: 1px solid var(--border);
+    z-index: 30; transform: translateX(100%); transition: transform 0.28s ease;
+    display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,0.1);
+  }
+  .map-detail-sheet.open { transform: translateX(0); }
+  .sheet-header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border2);
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-shrink: 0;
+  }
+  .sheet-close {
+    background: var(--bg); border: none; width: 32px; height: 32px; border-radius: 8px;
+    cursor: pointer; font-size: 18px; color: var(--ink2); flex-shrink: 0;
+  }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 16px; }
+  .sheet-cover {
+    width: 100%; height: 180px; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: 14px;
+    background: var(--bg); display: block;
+  }
+  .sheet-cover.is-broken { display: none !important; }
+  .sheet-cover-fallback {
+    width: 100%; height: 180px; border-radius: var(--radius-sm); margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--accent-light), var(--bg));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Serif Display', serif; font-size: 48px; color: var(--accent);
+  }
+  .sheet-baike-label {
+    font-size: 10px; color: #2932E1; font-weight: 700; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .sheet-baike-text { font-size: 13px; line-height: 1.6; color: var(--ink); margin-bottom: 12px; }
+  .sheet-title { font-family: 'DM Serif Display', serif; font-size: 20px; line-height: 1.3; margin-bottom: 8px; }
+  .sheet-meta-row { font-size: 12px; color: var(--ink2); margin-bottom: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .sheet-tag {
+    display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
+    background: var(--accent-light); color: var(--accent);
+  }
+  .sheet-tag.paid { background: rgba(181,101,69,0.12); color: var(--accent2); }
+  .sheet-highlights { font-size: 13px; line-height: 1.55; color: var(--ink); margin: 12px 0; }
+  .sheet-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px;
+    background: var(--ink); color: #fff; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600; text-decoration: none; margin-top: 8px;
+  }
+  .sheet-btn:hover { background: var(--accent); }
+  .restaurant-card {
+    background: var(--bg); border: 1px solid var(--border2); border-radius: var(--radius-sm);
+    padding: 12px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.2s;
+  }
+  .restaurant-card:hover { border-color: var(--accent); }
+  .restaurant-card .r-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .restaurant-card .r-rating { color: #E67E22; font-weight: 700; font-size: 13px; }
+  .restaurant-card .r-meta { font-size: 11px; color: var(--ink2); margin-top: 4px; }
+  .dianping-badge {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #FF6633;
+    font-weight: 700; margin-bottom: 8px;
+  }
+  .map-nav-tab.loading-tab { opacity: 0.6; pointer-events: none; }
+
+  .map-container.has-strip #map { bottom: 158px; }
+
+  /* —— 手机端 —— */
+  @media (max-width: 768px) {
+    html, body { height: 100%; min-height: 100dvh; }
+    body { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+    .page-welcome { padding: 20px 16px; align-items: flex-start; padding-top: max(24px, env(safe-area-inset-top)); }
+    .welcome-card { padding: 28px 20px 22px; max-width: none; }
+    .welcome-title { font-size: 22px; margin-bottom: 22px; }
+    .input-row { grid-template-columns: 1fr; gap: 0; }
+    .style-tag { flex: 1 1 calc(50% - 4px); font-size: 12px; padding: 9px 6px; }
+    .pref-tag { padding: 10px 6px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+    .gen-btn { min-height: 48px; font-size: 15px; margin-top: 16px; -webkit-tap-highlight-color: transparent; }
+
+    .page-results.active {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .map-container {
+      order: 1;
+      flex: 0 0 auto;
+      height: 44vh;
+      min-height: 220px;
+      max-height: 52vh;
+      border-bottom: 1px solid var(--border);
+    }
+    .map-container.has-strip #map { bottom: 132px; }
+
+    .panel {
+      order: 2;
+      flex: 1;
+      min-height: 0;
+      border-right: none;
+      border-top: none;
+    }
+    .panel-top { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+    .panel-top-title { font-size: 16px; }
+    .back-link { min-height: 44px; padding: 4px 0; -webkit-tap-highlight-color: transparent; }
+    .results-scroll { padding: 12px 14px 16px; -webkit-overflow-scrolling: touch; }
+
+    .plan-detail-card { padding: 16px 14px 14px; -webkit-tap-highlight-color: transparent; }
+    .detail-headline { font-size: 17px; }
+    .detail-card-top { padding-right: 24px; }
+
+    .map-top-navigation-bar {
+      top: 10px; left: 10px; right: 10px;
+      padding: 6px 8px; gap: 6px;
+      max-width: calc(100% - 20px);
+    }
+    .map-nav-tab { padding: 10px 12px; font-size: 11px; min-height: 40px; }
+
+    .map-bottom-strip {
+      left: 8px; right: 8px; bottom: 8px;
+      padding: 8px 10px; gap: 8px;
+    }
+    .map-strip-card { width: 148px; padding: 9px 10px; }
+
+    .map-detail-sheet {
+      top: auto; right: 0; left: 0;
+      width: 100%; max-width: 100%;
+      height: min(78dvh, 82vh);
+      max-height: calc(100% - 12vh);
+      border-left: none;
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      transform: translateY(100%);
+      box-shadow: 0 -12px 40px rgba(0,0,0,0.12);
+    }
+    .map-detail-sheet.open { transform: translateY(0); }
+    .map-detail-sheet::before {
+      content: '';
+      display: block;
+      width: 36px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 10px auto 0;
+      flex-shrink: 0;
+    }
+    .sheet-header { padding: 10px 16px 12px; padding-top: 4px; }
+    .sheet-close { width: 40px; height: 40px; }
+    .sheet-body { padding: 12px 16px 24px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+    .sheet-cover, .sheet-cover-fallback { height: 140px; }
+
+    .map-placeholder { padding: 24px 20px; }
+    .guide-title { font-size: 24px; }
+    .guide-subtitle { font-size: 13px; }
+
+    .loading-overlay .loading-title { font-size: 17px; padding: 0 24px; text-align: center; }
+  }
+
+  @media (max-width: 380px) {
+    .map-container { min-height: 200px; }
+    .map-strip-card { width: 132px; }
+    .style-tag { flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 页面一：欢迎 / 入参 -->
+<div id="page-welcome" class="page-welcome">
+  <div class="welcome-card">
+    <div class="welcome-logo"><div class="logo-mark"><i class="ti ti-compass"></i></div></div>
+    <h1 class="welcome-title">欢迎来到 Mappd Mobile，J人专属旅行 AI 助手</h1>
+
+    <div class="input-row">
+      <div class="input-group"><label class="input-label">出发城市</label><input class="input-field" id="start-point" type="text" value="上海"></div>
+      <div class="input-group"><label class="input-label">目的地大区</label><input class="input-field" id="destination" type="text" value="云南"></div>
+    </div>
+    <div class="input-row" style="margin-top:10px">
+      <div class="input-group"><label class="input-label">出发日期</label><input class="input-field" id="start-date" type="date" value="2026-10-01"></div>
+      <div class="input-group">
+        <div class="input-row" style="grid-template-columns:1fr 1fr;gap:6px">
+          <div class="input-group"><label class="input-label">天数</label><input class="input-field" id="duration" type="number" value="7" min="1"></div>
+          <div class="input-group"><label class="input-label">人数</label><input class="input-field" id="travelers" type="number" value="3" min="1"></div>
+        </div>
+      </div>
+    </div>
+    <div class="input-group" style="margin-top:10px">
+      <label class="input-label">旅游风格</label>
+      <div class="style-tags">
+        <div class="style-tag" data-style="nature" onclick="toggleStyleTag(this)">🏔 自然风景</div>
+        <div class="style-tag" data-style="culture" onclick="toggleStyleTag(this)">🏛 城市人文</div>
+        <div class="style-tag" data-style="food" onclick="toggleStyleTag(this)">🍜 在地美食</div>
+        <div class="style-tag" data-style="relaxed" onclick="toggleStyleTag(this)">🧘 慢节奏</div>
+        <div class="style-tag" data-style="niche" onclick="toggleStyleTag(this)">🗺 小众探索</div>
+      </div>
+      <div class="input-hint">可多选，不选则不做风格偏向</div>
+    </div>
+    <div class="input-group">
+      <label class="input-label">交通偏好</label>
+      <div class="pref-tags">
+        <div class="pref-tag" id="pref-drive" onclick="togglePrefTag('pref-drive')">🚗 舒适型自驾走廊</div>
+        <div class="pref-tag" id="pref-train" onclick="togglePrefTag('pref-train')">🚄 高铁无缝接驳</div>
+      </div>
+      <div class="input-hint">可多选，不选则由 AI 给出对比方案</div>
+    </div>
+    <button class="gen-btn" id="gen-btn" onclick="executeRoutePlannerSkill()">
+      <div class="spinner"></div>
+      <span class="btn-text">点击查看推荐路线</span>
+    </button>
+  </div>
+</div>
+
+<!-- 页面二：方案 + 地图 -->
+<div id="page-results" class="page-results">
+  <div class="panel">
+    <div class="panel-top">
+      <div>
+        <div class="panel-top-title">推荐路线</div>
+        <div class="panel-top-sub">点击卡片切换，地图同步动线</div>
+      </div>
+      <button class="back-link" onclick="goToWelcome()"><i class="ti ti-arrow-left"></i> 重新填写</button>
+    </div>
+    <div class="results-scroll">
+      <div class="plan-cards-stack" id="plan-cards-stack"></div>
+    </div>
+  </div>
+
+  <div class="map-container">
+    <div class="map-placeholder" id="map-placeholder">
+      <div class="guide-title">Mappd</div>
+      <div class="guide-subtitle" id="map-guide-subtitle">选择上方方案，地图将同步展示动线</div>
+    </div>
+    <div class="map-top-navigation-bar" id="map-navigation-bar"></div>
+    <div class="map-bottom-strip" id="map-bottom-strip"></div>
+    <div class="map-detail-sheet" id="map-detail-sheet">
+      <div class="sheet-header">
+        <div id="sheet-header-text"></div>
+        <button class="sheet-close" onclick="closeDetailSheet()" aria-label="关闭">×</button>
+      </div>
+      <div class="sheet-body" id="sheet-body"></div>
+    </div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner" style="width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite"></div>
+  <div class="loading-title">正在为您推演 2 套差异化路线…</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+<script>
+let map = null, markerLayers = [], polylineLayers = [];
+let planOptions = [], selectedPlanIndex = 0, currentSkillResponse = null;
+let lastSearchPayload = {};
+let dayDetailCache = {};
+let currentMapView = 'overview';
+let dayDetailLoadingDay = null;
+let lastDayDetailError = '';
+let activeStripCardId = null;
+let currentStripItems = [];
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function getPlanHeadline(plan) {
+  if (!plan) return '推荐路线';
+  return plan.headline
+    || plan.title
+    || plan.plan_title
+    || (plan.option_label && plan.option_label.includes('·')
+      ? plan.option_label.split('·').slice(1).join('·').trim()
+      : plan.option_label)
+    || plan.route_overview
+    || '推荐路线';
+}
+
+function togglePrefTag(id) { document.getElementById(id).classList.toggle('selected'); }
+function toggleStyleTag(el) { el.classList.toggle('selected'); }
+function getSelectedTravelStyles() {
+  return [...document.querySelectorAll('.style-tag.selected')].map(el => el.dataset.style);
+}
+
+function goToWelcome() {
+  document.getElementById('page-welcome').style.display = 'flex';
+  document.getElementById('page-results').classList.remove('active');
+}
+
+function showResultsPage() {
+  document.getElementById('page-welcome').style.display = 'none';
+  document.getElementById('page-results').classList.add('active');
+  updateMapGuideCopy();
+  requestMapResize();
+}
+
+function onMapBackgroundClick() {
+  activeStripCardId = null;
+  document.querySelectorAll('.map-strip-card').forEach(el => el.classList.remove('active'));
+  markerLayers.forEach(m => {
+    const pin = m.getElement()?.querySelector('.route-node-pin, .seg-mid-pin');
+    if (pin) pin.classList.remove('is-active');
+  });
+}
+
+function isMobileLayout() {
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function updateMapGuideCopy() {
+  const el = document.getElementById('map-guide-subtitle');
+  if (el) el.textContent = isMobileLayout()
+    ? '选择下方方案，地图将同步展示动线'
+    : '选择左侧方案，地图将同步展示动线';
+}
+
+function mapFitPadding() {
+  const hasStrip = document.querySelector('.map-container')?.classList.contains('has-strip');
+  if (isMobileLayout()) {
+    return hasStrip
+      ? { paddingTopLeft: [12, 48], paddingBottomRight: [12, 128] }
+      : { paddingTopLeft: [12, 48], paddingBottomRight: [12, 24] };
+  }
+  return hasStrip
+    ? { paddingTopLeft: [24, 24], paddingBottomRight: [24, 172] }
+    : { padding: [28, 28] };
+}
+
+function initSandboxMap() {
+  if (map) { map.invalidateSize(); return; }
+  document.getElementById('map-placeholder').style.display = 'none';
+  map = L.map('map', { zoomControl: false, attributionControl: false }).setView([25.04, 102.73], 5);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map);
+  map.on('click', onMapBackgroundClick);
+}
+
+function clearMapLayers() {
+  markerLayers.forEach(m => m.remove()); markerLayers = [];
+  polylineLayers.forEach(p => p.remove()); polylineLayers = [];
+  renderBottomStrip([]);
+}
+
+function renderBottomStrip(items) {
+  currentStripItems = items;
+  const strip = document.getElementById('map-bottom-strip');
+  const container = document.querySelector('.map-container');
+  if (!items.length) {
+    strip.classList.remove('active');
+    strip.innerHTML = '';
+    container?.classList.remove('has-strip');
+    activeStripCardId = null;
+    return;
+  }
+  strip.classList.add('active');
+  container?.classList.add('has-strip');
+  strip.innerHTML = items.map(item => `
+    <div class="map-strip-card ${item.stripClass}${item.id === activeStripCardId ? ' active' : ''}"
+         data-card-id="${escapeHtml(item.id)}">
+      <div class="strip-type">${escapeHtml(item.typeLabel)}</div>
+      <div class="strip-title">${escapeHtml(item.title)}</div>
+      <div class="strip-body">${escapeHtml(item.body)}</div>
+    </div>
+  `).join('');
+  strip.querySelectorAll('.map-strip-card').forEach(el => {
+    el.addEventListener('click', () => onStripCardClick(el.dataset.cardId));
+  });
+  if (activeStripCardId && items.some(i => i.id === activeStripCardId)) {
+    scrollStripCardIntoView(activeStripCardId);
+  } else if (items[0]) {
+    highlightStripCard(items[0].id, false);
+  }
+  setTimeout(() => map?.invalidateSize(), 0);
+}
+
+function scrollStripCardIntoView(cardId) {
+  const el = document.querySelector(`.map-strip-card[data-card-id="${cardId}"]`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+}
+
+function highlightStripCard(cardId, panMap = true) {
+  activeStripCardId = cardId;
+  document.querySelectorAll('.map-strip-card').forEach(el => {
+    el.classList.toggle('active', el.dataset.cardId === cardId);
+  });
+  scrollStripCardIntoView(cardId);
+  markerLayers.forEach(m => {
+    if (m._stripCardId != null) {
+      const pin = m.getElement()?.querySelector('.route-node-pin, .seg-mid-pin');
+      if (pin) pin.classList.toggle('is-active', m._stripCardId === cardId);
+    }
+  });
+  if (panMap) {
+    const item = currentStripItems.find(i => i.id === cardId);
+    if (item?.latlng && map) map.panTo(item.latlng, { animate: true });
+  }
+}
+
+function onStripCardClick(cardId) {
+  highlightStripCard(cardId, true);
+  const item = currentStripItems.find(i => i.id === cardId);
+  if (item?.onDetail) item.onDetail();
+}
+
+function createMapPin(latlng, html, stripCardId, zIndex = 800) {
+  const m = L.marker(latlng, {
+    icon: L.divIcon({ className: 'map-label-icon', html, iconSize: [30, 30], iconAnchor: [15, 15] }),
+    zIndexOffset: zIndex,
+  });
+  m._stripCardId = stripCardId;
+  m.on('click', (e) => {
+    L.DomEvent.stopPropagation(e);
+    highlightStripCard(stripCardId, false);
+  });
+  addMapLayer(m);
+  return m;
+}
+
+function buildOverviewStripItems(data) {
+  const items = [];
+  const nodes = data.nodes || [];
+  nodes.forEach((n, idx) => {
+    const acc = getAccForNode(n, data.accommodation, idx);
+    const outbound = data.roundtrip?.outbound;
+    const ret = data.roundtrip?.return;
+    const startCity = lastSearchPayload.start_point || '';
+    let bodyParts = [];
+    if (idx === 0 && outbound?.method) {
+      bodyParts.push(`✈️ ${startCity && !outbound.method.includes(startCity) ? startCity + '→' + n.city : outbound.method}`);
+    }
+    if (acc || n.nights) bodyParts.push(`🏨 ${n.nights}晚 ${acc?.price_range || ''}`);
+    if (idx === nodes.length - 1 && ret?.method) bodyParts.push(`↩️ ${ret.method}`);
+    items.push({
+      id: `node-${idx}`,
+      stripClass: 'strip-node',
+      typeLabel: `节点 ${idx + 1}`,
+      title: n.city,
+      body: bodyParts.join(' · ') || n.core_value || '',
+      latlng: n.latlng,
+      onDetail: () => {
+        const html = buildNodeAnnotationHtml(n, idx, data);
+        showRoutePopup(`${idx + 1}. ${n.city}`, html);
+      },
+    });
+    if (idx < nodes.length - 1) {
+      const seg = getSegmentBetween(n.city, nodes[idx + 1].city, data.segment_transport);
+      items.push({
+        id: `seg-${idx}`,
+        stripClass: 'strip-segment',
+        typeLabel: '城际转场',
+        title: `${n.city} → ${nodes[idx + 1].city}`,
+        body: seg ? `${seg.method}${seg.self_drive_rec ? ' · 自驾' : ''}` : '接驳中',
+        latlng: null,
+        onDetail: () => seg && showRoutePopup(`🚗 ${seg.from} → ${seg.to}`, buildSegmentAnnotationHtml(seg)),
+      });
+    }
+  });
+  return items;
+}
+
+function showRoutePopup(title, html) {
+  document.getElementById('sheet-header-text').innerHTML = `<span style="font-weight:700">${escapeHtml(title)}</span>`;
+  document.getElementById('sheet-body').innerHTML = html;
+  document.getElementById('map-detail-sheet').classList.add('open');
+}
+
+function buildDayStripItems(day, dayNum) {
+  const items = [];
+  if (day.day_start?.latlng) {
+    items.push({
+      id: 'stay',
+      stripClass: 'strip-stay',
+      typeLabel: '住宿起点',
+      title: day.day_start.name,
+      body: `${day.day_start.type} · ${day.day_start.price_range}`,
+      latlng: day.day_start.latlng,
+      onDetail: () => openStayDetail(day.day_start, dayNum),
+    });
+  }
+  (day.attractions || []).forEach((a, i) => {
+    items.push({
+      id: `attr-${i}`,
+      stripClass: 'strip-attraction',
+      typeLabel: '景点',
+      title: a.name,
+      body: `${a.ticket_type === 'paid' ? '付费 ' + a.price : '免费'} · ${a.hours}`,
+      latlng: a.latlng,
+      onDetail: () => openAttractionDetail(a),
+    });
+  });
+  [
+    { key: 'breakfast', label: '早餐' },
+    { key: 'lunch', label: '午餐' },
+    { key: 'dinner', label: '晚餐' },
+  ].forEach(({ key, label }) => {
+    const slot = day.meals?.[key];
+    if (!slot?.anchor_latlng) return;
+    const top = slot.restaurants?.[0];
+    items.push({
+      id: `meal-${key}`,
+      stripClass: 'strip-meal',
+      typeLabel: label,
+      title: slot.area || top?.name || label,
+      body: top ? `★${top.rating} ${top.cuisine} · ${top.price_per_person}` : '推荐美食区',
+      latlng: slot.anchor_latlng,
+      onDetail: () => openMealDetail({ ...slot, slotKey: key }, dayNum),
+    });
+  });
+  return items;
+}
+
+function closeDetailSheet() {
+  document.getElementById('map-detail-sheet').classList.remove('open');
+}
+
+function getPlanCacheKey() {
+  return `plan_${selectedPlanIndex}`;
+}
+
+function getDayCacheKey(dayNum) {
+  return `${getPlanCacheKey()}_d${dayNum}`;
+}
+
+function getCachedDay(dayNum) {
+  return dayDetailCache[getDayCacheKey(dayNum)] || null;
+}
+
+async function ensureDayLoaded(dayNum) {
+  const cacheKey = getDayCacheKey(dayNum);
+  if (dayDetailCache[cacheKey]) return dayDetailCache[cacheKey];
+
+  if (dayDetailLoadingDay === dayNum) return null;
+  dayDetailLoadingDay = dayNum;
+  lastDayDetailError = '';
+
+  try {
+    const res = await fetch('/api/day_detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plan: currentSkillResponse,
+        day: dayNum,
+        days: lastSearchPayload.days || 7,
+        travelers: lastSearchPayload.travelers || 2,
+        destination: lastSearchPayload.destination,
+        start_point: lastSearchPayload.start_point,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      lastDayDetailError = data.error;
+      return null;
+    }
+    const day = (data.days || []).find(d => d.day === dayNum) || data.days?.[0];
+    if (day) dayDetailCache[cacheKey] = day;
+    else lastDayDetailError = '当天数据为空';
+    return day || null;
+  } catch (e) {
+    lastDayDetailError = '网络请求失败，请稍后重试';
+    return null;
+  } finally {
+    dayDetailLoadingDay = null;
+  }
+}
+
+function loadDayDetailsForPlan() {
+  dayDetailCache = {};
+  lastDayDetailError = '';
+  buildMapDayTabs(false);
+}
+
+function buildMapDayTabs(isLoading = false) {
+  const bar = document.getElementById('map-navigation-bar');
+  const totalDays = parseInt(lastSearchPayload.days, 10) || 7;
+  const overviewActive = currentMapView === 'overview' ? ' active' : '';
+  let html = `<button type="button" class="map-nav-tab${overviewActive}" data-view="overview" onclick="switchMapSandboxView('overview')">🗺 路线总览</button>`;
+  for (let d = 1; d <= totalDays; d++) {
+    const active = currentMapView === `day-${d}` ? ' active' : '';
+    const loading = isLoading ? ' loading-tab' : '';
+    html += `<button type="button" class="map-nav-tab${active}${loading}" data-view="day-${d}" onclick="switchMapSandboxView('day-${d}')">第${d}天</button>`;
+  }
+  bar.innerHTML = html;
+}
+
+function openAttractionDetail(attraction) {
+  const sheet = document.getElementById('map-detail-sheet');
+  const isPaid = attraction.ticket_type === 'paid';
+  const coverHtml = attraction.cover_image
+    ? `<img class="sheet-cover" src="${escapeHtml(attraction.cover_image)}" alt="${escapeHtml(attraction.name)}" referrerpolicy="no-referrer" onerror="this.classList.add('is-broken');this.nextElementSibling.style.display='flex'"/><div class="sheet-cover-fallback" style="display:none"><span>${escapeHtml(attraction.name.charAt(0))}</span></div>`
+    : `<div class="sheet-cover-fallback"><span>${escapeHtml(attraction.name.charAt(0))}</span></div>`;
+
+  document.getElementById('sheet-header-text').innerHTML = `<span class="sheet-tag">景点</span>`;
+  document.getElementById('sheet-body').innerHTML = `
+    ${coverHtml}
+    <h2 class="sheet-title">${escapeHtml(attraction.name)}</h2>
+    <div class="sheet-meta-row">
+      <span class="sheet-tag ${isPaid ? 'paid' : ''}">${isPaid ? '付费 ' + escapeHtml(attraction.price) : '免费'}</span>
+      <span>🕐 ${escapeHtml(attraction.hours)}</span>
+    </div>
+    <div class="sheet-baike-label">📖 百度百科 · 公开介绍</div>
+    <div class="sheet-baike-text">${escapeHtml(attraction.baike_summary || attraction.highlights || '')}</div>
+    <a class="sheet-btn" href="${escapeHtml(attraction.baike_url || '#')}" target="_blank" rel="noopener" style="background:#2932E1;margin-right:8px">查看百度百科 →</a>
+    ${isPaid && attraction.booking_url ? `<a class="sheet-btn" href="${escapeHtml(attraction.booking_url)}" target="_blank" rel="noopener">预约官网 →</a>` : ''}
+  `;
+  sheet.classList.add('open');
+}
+
+function openStayDetail(stay, dayNum) {
+  const sheet = document.getElementById('map-detail-sheet');
+  document.getElementById('sheet-header-text').innerHTML = `<span class="sheet-tag">当日起点 · 住宿</span>`;
+  document.getElementById('sheet-body').innerHTML = `
+    <div class="sheet-cover-fallback" style="display:flex"><span>🏨</span></div>
+    <h2 class="sheet-title">${escapeHtml(stay.name)}</h2>
+    <div class="sheet-meta-row"><span>第${dayNum}天出发据点</span></div>
+    <div class="sheet-baike-text"><b>住宿类型：</b>${escapeHtml(stay.type)}<br/><b>区域：</b>${escapeHtml(stay.area)}<br/><b>参考价格：</b>${escapeHtml(stay.price_range)}</div>
+    <p style="font-size:12px;color:var(--ink2)">当日子路线由此出发，单向游览不折返。</p>
+  `;
+  sheet.classList.add('open');
+}
+
+function openMealDetail(mealSlot, dayNum) {
+  const sheet = document.getElementById('map-detail-sheet');
+  const labels = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐' };
+  const restaurants = (mealSlot.restaurants || []).slice().sort((a, b) => b.rating - a.rating);
+
+  document.getElementById('sheet-header-text').innerHTML = `
+    <span class="sheet-tag" style="background:rgba(181,101,69,0.15);color:var(--accent2)">美食</span>
+    <div style="font-weight:700;font-size:15px;margin-top:4px">第${dayNum}天 · ${labels[mealSlot.slotKey] || mealSlot.time_label}</div>
+    <div style="font-size:11px;color:var(--ink3)">${mealSlot.area || ''}</div>
+  `;
+
+  const listHtml = restaurants.map((r, i) => `
+    <a class="restaurant-card" href="${escapeHtml(r.dianping_url)}" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit">
+      <div class="dianping-badge">大众点评 · 推荐 ${i + 1}</div>
+      <div class="r-name">${escapeHtml(r.name)}</div>
+      <div class="r-rating">★ ${r.rating} <span style="font-weight:400;color:var(--ink3)">(${r.review_count}条)</span></div>
+      <div class="r-meta">${escapeHtml(r.cuisine)} · ${escapeHtml(r.price_per_person)} · ${escapeHtml(r.distance)}</div>
+      <div class="r-meta" style="color:var(--accent2);margin-top:4px">招牌：${escapeHtml(r.highlight_dish)}</div>
+    </a>
+  `).join('');
+
+  document.getElementById('sheet-body').innerHTML = `
+    <p style="font-size:12px;color:var(--ink2);margin-bottom:12px">按评分从高到低排序，共 ${restaurants.length} 家</p>
+    ${listHtml || '<p>暂无餐厅数据</p>'}
+  `;
+  sheet.classList.add('open');
+}
+
+async function renderDayDetailMap(dayNum) {
+  renderBottomStrip([{
+    id: 'loading',
+    stripClass: 'strip-node',
+    typeLabel: '加载中',
+    title: `第${dayNum}天`,
+    body: '正在获取当日行程…',
+  }]);
+
+  const day = await ensureDayLoaded(dayNum);
+  if (!day) {
+    renderBottomStrip([{
+      id: 'error',
+      stripClass: 'strip-node',
+      typeLabel: '提示',
+      title: `第${dayNum}天`,
+      body: lastDayDetailError || '暂无数据',
+    }]);
+    return;
+  }
+
+  closeDetailSheet();
+  const items = buildDayStripItems(day, dayNum);
+  const points = [];
+  const routeLine = [];
+  let pinNum = 1;
+
+  if (day.day_start?.latlng) {
+    points.push(day.day_start.latlng);
+    routeLine.push(day.day_start.latlng);
+    createMapPin(
+      day.day_start.latlng,
+      `<div class="route-node-pin is-first">${pinNum++}</div>`,
+      'stay',
+      900,
+    );
+  }
+
+  (day.attractions || []).forEach((a, i) => {
+    if (!a.latlng) return;
+    points.push(a.latlng);
+    routeLine.push(a.latlng);
+    const pinClass = i === (day.attractions.length - 1) && !day.meals ? ' is-last' : '';
+    createMapPin(a.latlng, `<div class="route-node-pin${pinClass}">${pinNum++}</div>`, `attr-${i}`, 850);
+  });
+
+  if (routeLine.length > 1) {
+    const line = L.polyline(routeLine, { color: '#5B4E8A', weight: 4, opacity: 0.8 });
+    addMapLayer(line);
+    if (typeof L.polylineDecorator === 'function') {
+      addMapLayer(L.polylineDecorator(line, {
+        patterns: [{ offset: '15%', repeat: '30%', symbol: L.Symbol.arrowHead({ pixelSize: 9, pathOptions: { color: '#5B4E8A', weight: 2 } }) }],
+      }));
+    }
+  }
+
+  [
+    { key: 'breakfast', label: '早' },
+    { key: 'lunch', label: '午' },
+    { key: 'dinner', label: '晚' },
+  ].forEach(({ key, label }) => {
+    const slot = day.meals?.[key];
+    if (!slot?.anchor_latlng) return;
+    points.push(slot.anchor_latlng);
+    createMapPin(
+      slot.anchor_latlng,
+      `<div class="seg-mid-pin" style="font-size:11px">${label}</div>`,
+      `meal-${key}`,
+      700,
+    );
+  });
+
+  renderBottomStrip(items);
+  if (points.length) map.fitBounds(L.latLngBounds(points).pad(0.22), mapFitPadding());
+}
+
+function generateGeodesicLinePoints(fromArr, toArr, curveOffset) {
+  const points = [], steps = 30;
+  const fLat = parseFloat(fromArr[0]), fLng = parseFloat(fromArr[1]);
+  const tLat = parseFloat(toArr[0]), tLng = parseFloat(toArr[1]);
+  const midLat = (fLat + tLat) / 2, midLng = (fLng + tLng) / 2;
+  const dLat = tLat - fLat, dLng = tLng - fLng;
+  const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+  if (dist === 0) return [[fLat, fLng]];
+  const magnitude = dist * curveOffset;
+  const controlLat = midLat + (-dLng / dist) * magnitude;
+  const controlLng = midLng + (dLat / dist) * magnitude;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    points.push([
+      (1 - t) * (1 - t) * fLat + 2 * (1 - t) * t * controlLat + t * t * tLat,
+      (1 - t) * (1 - t) * fLng + 2 * (1 - t) * t * controlLng + t * t * tLng,
+    ]);
+  }
+  return points;
+}
+
+async function executeRoutePlannerSkill() {
+  const payload = {
+    start_point: document.getElementById('start-point').value,
+    destination: document.getElementById('destination').value,
+    days: document.getElementById('duration').value,
+    travelers: document.getElementById('travelers').value,
+    hasDrive: document.getElementById('pref-drive').classList.contains('selected'),
+    hasTrain: document.getElementById('pref-train').classList.contains('selected'),
+    travel_styles: getSelectedTravelStyles(),
+  };
+
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true; btn.classList.add('loading');
+  document.getElementById('loading-overlay').classList.add('active');
+
+  try {
+    lastSearchPayload = payload;
+    const res = await fetch('/api/plan_options', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    planOptions = data.options || [];
+    if (!planOptions.length) throw new Error('no options');
+
+    selectedPlanIndex = 0;
+    showResultsPage();
+    renderPlanDetailCards();
+    selectPlan(0);
+    initSandboxMap();
+    document.getElementById('map-navigation-bar').classList.add('active');
+    buildMapDayTabs(false);
+    requestMapResize();
+  } catch (e) {
+    alert('路线生成失败，请稍后重试');
+  } finally {
+    document.getElementById('loading-overlay').classList.remove('active');
+    btn.disabled = false; btn.classList.remove('loading');
+  }
+}
+
+function buildPlanDetailCardHtml(plan, idx) {
+  const selected = idx === selectedPlanIndex;
+  const tags = (plan.experience_tags || []).map(t => `<span class="tag-capsule"># ${t}</span>`).join('');
+  const nodes = (plan.nodes || []).map(n => `
+    <div class="detail-node">
+      <span class="detail-node-city">📍 ${n.city}</span>
+      <span class="detail-node-nights">${n.nights} 晚</span>
+    </div>
+  `).join('');
+  const ce = plan.cost_estimate || {};
+
+  return `
+    <div class="plan-detail-card ${selected ? 'selected' : ''}" onclick="selectPlan(${idx})" data-idx="${idx}">
+      <div class="detail-check"><i class="ti ti-check"></i></div>
+      <div class="detail-card-top">
+        <div>
+          <div class="detail-badge">${plan.option_label || '方案 ' + (idx + 1)}<span class="detail-viewing">地图中</span></div>
+          <div class="detail-headline">${getPlanHeadline(plan)}</div>
+        </div>
+        <div class="detail-price">￥${ce.total_per_person || '—'}<span style="font-size:10px;font-weight:500;color:var(--ink3)">/人</span></div>
+      </div>
+      ${plan.diff_highlight ? `<div class="detail-diff">${plan.diff_highlight}</div>` : ''}
+      ${tags ? `<div class="tag-capsule-container" style="margin-bottom:0">${tags}</div>` : ''}
+      <div class="detail-route">${plan.route_overview || ''}</div>
+      <div class="detail-section-label">决策逻辑</div>
+      <div class="detail-logic">${plan.planning_logic || ''}</div>
+      <div class="detail-section-label">动线节点</div>
+      <div class="detail-nodes">${nodes}</div>
+      <div class="detail-cost-row">
+        <span style="color:var(--ink2)">大交通 ￥${ce.transport || '—'} · 住宿 ￥${ce.accommodation || '—'}</span>
+        <span class="detail-cost-total">人均 ￥${ce.total_per_person || '—'}</span>
+      </div>
+      ${plan.peak_season_alert ? `<div class="detail-alert"><i class="ti ti-alert-triangle"></i> ${plan.peak_season_alert}</div>` : ''}
+    </div>
+  `;
+}
+
+function renderPlanDetailCards() {
+  document.getElementById('plan-cards-stack').innerHTML =
+    planOptions.map((plan, idx) => buildPlanDetailCardHtml(plan, idx)).join('');
+}
+
+function selectPlan(idx) {
+  selectedPlanIndex = idx;
+  currentSkillResponse = planOptions[idx];
+  dayDetailCache = {};
+  renderPlanDetailCards();
+  loadDayDetailsForPlan();
+  switchMapSandboxView('overview');
+  const card = document.querySelector(`.plan-detail-card[data-idx="${idx}"]`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function normCity(name) {
+  return (name || '').replace(/市|县|区|自治州/g, '').trim();
+}
+
+function cityMatch(a, b) {
+  const na = normCity(a), nb = normCity(b);
+  return na && nb && (na.includes(nb) || nb.includes(na));
+}
+
+function getAccForNode(node, accList, idx) {
+  if (!accList?.length) return null;
+  return accList.find(a => cityMatch(a.location, node.city)) || accList[idx] || null;
+}
+
+function getSegmentBetween(fromCity, toCity, segments) {
+  return (segments || []).find(s => cityMatch(s.from, fromCity) && cityMatch(s.to, toCity));
+}
+
+function offsetLatLng(latlng, latOff, lngOff) {
+  return [latlng[0] + latOff, latlng[1] + lngOff];
+}
+
+function curveBearing(p1, p2) {
+  const lat1 = p1[0] * Math.PI / 180, lat2 = p2[0] * Math.PI / 180;
+  const dLng = (p2[1] - p1[1]) * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function addMapLayer(layer) {
+  layer.addTo(map);
+  if (layer instanceof L.Marker) markerLayers.push(layer);
+  else polylineLayers.push(layer);
+}
+
+function createLabelMarker(latlng, html, iconAnchor = [0, 0]) {
+  const m = L.marker(latlng, {
+    icon: L.divIcon({ className: 'map-label-icon', html, iconAnchor }),
+    zIndexOffset: 500,
+  });
+  addMapLayer(m);
+  return m;
+}
+
+function buildNodeAnnotationHtml(node, idx, data) {
+  const parts = [];
+  const outbound = data.roundtrip?.outbound;
+  const ret = data.roundtrip?.return;
+  const acc = getAccForNode(node, data.accommodation, idx);
+  const startCity = lastSearchPayload.start_point || '';
+
+  if (idx === 0 && outbound?.method) {
+    const arriveHint = startCity && !outbound.method.includes(startCity)
+      ? `${startCity} → ${node.city}` : outbound.method;
+    parts.push(`
+      <div class="map-anno-card map-anno-flight">
+        <div class="anno-title">✈️ 抵达 · 去程</div>
+        <div>${escapeHtml(arriveHint)}</div>
+        <div class="anno-meta">${escapeHtml(outbound.duration || '')} ${outbound.price_ref ? '· ' + escapeHtml(outbound.price_ref) : ''}</div>
+      </div>`);
+  }
+
+  if (acc || node.nights) {
+    parts.push(`
+      <div class="map-anno-card map-anno-stay">
+        <div class="anno-title">🏨 留宿 · ${escapeHtml(node.city)}</div>
+        <div>${acc ? `${escapeHtml(acc.nights_label || '')} ${node.nights}晚 · ${escapeHtml(acc.type || '')}` : `${node.nights} 晚`}</div>
+        <div class="anno-meta">${escapeHtml(acc?.price_range || '')}${acc?.location && !cityMatch(acc.location, node.city) ? ' · ' + escapeHtml(acc.location) : ''}</div>
+      </div>`);
+  }
+
+  if (idx === (data.nodes?.length || 0) - 1 && ret?.method) {
+    parts.push(`
+      <div class="map-anno-card map-anno-flight">
+        <div class="anno-title">↩️ 返程</div>
+        <div>${escapeHtml(ret.method)}</div>
+        <div class="anno-meta">${escapeHtml(ret.duration || '')} ${ret.price_ref ? '· ' + escapeHtml(ret.price_ref) : ''}</div>
+      </div>`);
+  }
+
+  return parts.length ? `<div class="map-anno-wrap">${parts.join('')}</div>` : '';
+}
+
+function buildSegmentAnnotationHtml(seg) {
+  if (!seg) return '<p style="font-size:12px;color:var(--ink2)">暂无转场信息</p>';
+  return `
+    <div class="map-anno-wrap">
+      <div class="map-anno-card map-anno-segment">
+        <div class="anno-title">🚗 城际转场</div>
+        <div>${escapeHtml(seg.method || '城际接驳')}${seg.self_drive_rec ? ' · 推荐自驾' : ''}</div>
+        <div class="anno-meta">${escapeHtml(seg.reason || '')}</div>
+      </div>
+    </div>`;
+}
+
+function addFlowArrowsOnCurve(curvePoints) {
+  const ratios = [0.35, 0.62, 0.88];
+  ratios.forEach((ratio, i) => {
+    const idx = Math.min(Math.floor(curvePoints.length * ratio), curvePoints.length - 2);
+    const p1 = curvePoints[idx], p2 = curvePoints[idx + 1];
+    if (!p1 || !p2) return;
+    const mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+    const angle = curveBearing(p1, p2);
+    createLabelMarker(mid, `<span class="map-flow-arrow" style="transform:rotate(${angle - 90}deg)">▶</span>`, [10, 10]);
+  });
+}
+
+function addPolylineWithFlow(curvePoints) {
+  const line = L.polyline(curvePoints, { color: '#4A5B4E', weight: 5, opacity: 0.88, lineCap: 'round', lineJoin: 'round' });
+  addMapLayer(line);
+
+  if (typeof L.polylineDecorator === 'function') {
+    const decorator = L.polylineDecorator(line, {
+      patterns: [{
+        offset: '12%',
+        repeat: '28%',
+        symbol: L.Symbol.arrowHead({
+          pixelSize: 11,
+          headAngle: 40,
+          polygon: false,
+          pathOptions: { stroke: true, weight: 3, color: '#4A5B4E', opacity: 0.95 },
+        }),
+      }],
+    });
+    addMapLayer(decorator);
+  } else {
+    addFlowArrowsOnCurve(curvePoints);
+  }
+}
+
+function renderIntegratedRouteOverview(data) {
+  if (!data.nodes?.length) return;
+  const geoPoints = [];
+  const nCount = data.nodes.length;
+  const stripItems = buildOverviewStripItems(data);
+
+  data.nodes.forEach((n, idx) => {
+    if (!n.latlng) return;
+    geoPoints.push(n.latlng);
+    const pinClass = idx === 0 ? ' is-first' : idx === nCount - 1 ? ' is-last' : '';
+    createMapPin(n.latlng, `<div class="route-node-pin${pinClass}">${idx + 1}</div>`, `node-${idx}`, 900);
+  });
+
+  for (let i = 0; i < geoPoints.length - 1; i++) {
+    const fromNode = data.nodes[i];
+    const toNode = data.nodes[i + 1];
+    const curve = generateGeodesicLinePoints(geoPoints[i], geoPoints[i + 1], 0.12);
+    addPolylineWithFlow(curve);
+
+    const seg = getSegmentBetween(fromNode.city, toNode.city, data.segment_transport);
+    const midIdx = Math.floor(curve.length / 2);
+    const mid = curve[midIdx];
+    const segItem = stripItems.find(s => s.id === `seg-${i}`);
+    if (segItem) segItem.latlng = mid;
+    if (seg) {
+      createMapPin(mid, '<div class="seg-mid-pin">↔</div>', `seg-${i}`, 600);
+    }
+  }
+
+  renderBottomStrip(stripItems);
+  if (geoPoints.length) map.fitBounds(L.latLngBounds(geoPoints).pad(0.35), mapFitPadding());
+}
+
+function switchMapSandboxView(viewType) {
+  currentMapView = viewType;
+  document.querySelectorAll('.map-nav-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.view === viewType);
+  });
+  clearMapLayers();
+  closeDetailSheet();
+  if (!currentSkillResponse || !map) return;
+
+  if (viewType === 'overview') {
+    renderIntegratedRouteOverview(currentSkillResponse);
+    return;
+  }
+
+  if (viewType.startsWith('day-')) {
+    const dayNum = parseInt(viewType.replace('day-', ''), 10);
+    renderDayDetailMap(dayNum);
+  }
+}
+
+let mapResizeTimer = null;
+function requestMapResize() {
+  clearTimeout(mapResizeTimer);
+  mapResizeTimer = setTimeout(() => {
+    if (map) map.invalidateSize();
+  }, 80);
+}
+
+window.addEventListener('resize', () => {
+  updateMapGuideCopy();
+  requestMapResize();
+});
+window.addEventListener('orientationchange', () => {
+  updateMapGuideCopy();
+  requestMapResize();
+});
+
+updateMapGuideCopy();
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+---
+description: mappd-mobile 独立仓库的部署工作流（勿推送到 mappd 主项目）
+alwaysApply: true
+---
+
+# 部署工作流（mappd-mobile）
+
+本项目为 **独立手机端仓库**，与 `https://github.com/ggjay/mappd` 无关。
+
+## GitHub + Vercel
+
+完成改动后，在已配置 `origin` 指向 **mappd-mobile 仓库** 的前提下：
+
+1. `git add` 相关文件
+2. `git commit`（简洁说明 why）
+3. `git push origin main`
+
+若尚未创建远程仓库，先提示用户在 GitHub 新建 `mappd-mobile` 并 `git remote add origin`，**不要**推送到 `ggjay/mappd`。
+
+## Vercel
+
+在 Vercel 新建项目并关联本仓库，环境变量配置 `DEEPSEEK_API_KEY`。
+
+## 例外
+
+- 不要 force push `main`
+- 不要将本目录的提交推送到 mappd 主仓库

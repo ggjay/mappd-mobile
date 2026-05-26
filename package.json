@@ -1,0 +1,15 @@
+{
+  "name": "mappd-mobile",
+  "version": "1.0.0",
+  "description": "Mappd 手机端 — 把散乱攻略变成一张可以走的地图",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "dev:vercel": "vercel dev --listen 3000",
+    "start": "node dev-server.js"
+  },
+  "devDependencies": {
+    "vercel": "^41.0.0"
+  }
+}
