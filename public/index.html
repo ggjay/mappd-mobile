@@ -147,6 +147,7 @@
     flex: 1; min-height: 180px; position: relative; background: #E8E2D5;
     border-bottom: 1px solid var(--border);
   }
+  .app-overview { background: var(--surface); }
   .app-overview .map-zone {
     flex: 0 0 40dvh; min-height: 220px; max-height: 44dvh;
   }
@@ -154,7 +155,8 @@
   .overview-scroll-panel {
     flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 8px;
+    padding-bottom: 0;
+    background: transparent;
   }
   #map { position: absolute; inset: 0; z-index: 1; background: #E8E2D5; }
   .map-placeholder {
@@ -191,7 +193,7 @@
     flex: 0 0 calc(100vw - 52px); max-width: 360px; scroll-snap-align: center;
     background: transparent;
   }
-  .nodes-section { padding-bottom: 12px; border-top: 1px dashed var(--border2); margin-top: 4px; }
+  .nodes-section { padding-bottom: 12px; border-top: 1px dashed var(--border2); margin-top: 4px; background: transparent; }
   .nodes-carousel {
     display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
     padding: 4px 16px 8px; -webkit-overflow-scrolling: touch;
@@ -630,49 +632,84 @@ const MapEngine = {
     return Math.abs(+a[0] - +b[0]) < 0.00015 && Math.abs(+a[1] - +b[1]) < 0.00015;
   },
 
+  hasValidLatLng(latlng) {
+    return Array.isArray(latlng) && latlng.length >= 2 && latlng.every(v => Number.isFinite(+v));
+  },
+
+  /** 收集有效节点并保留原始下标 */
+  collectRouteNodes(data) {
+    return (data.nodes || [])
+      .map((n, origIdx) => ({ node: n, origIdx }))
+      .filter(({ node }) => this.hasValidLatLng(node.latlng))
+      .map(({ node, origIdx }) => ({ ...node, origIdx }));
+  },
+
+  /** 生成 1…N 连续编号的地图 pin */
+  makeRoutePinHtml(seq, total) {
+    let cls = 'route-node-pin';
+    if (seq === 1) cls += ' is-first';
+    if (seq === total) cls += ' is-last';
+    return `<div class="${cls}">${seq}</div>`;
+  },
+
+  /** 校验动线编号必须从 1 递增，否则打 warn 并修正展示 */
+  assertRouteSequence(seqList, tag) {
+    const fixed = seqList.map((_, i) => i + 1);
+    const ok = seqList.every((s, i) => s === i + 1);
+    if (!ok) console.warn(`[Mappd] ${tag} 动线编号不连续，已按 1…N 重排`, { was: seqList, fixed });
+    return fixed;
+  },
+
+  assignRoutePinLabels(stops) {
+    const total = stops.length;
+    const seqs = this.assertRouteSequence(stops.map((_, i) => i + 1), 'route');
+    return stops.map((stop, i) => ({
+      ...stop,
+      routeSeq: seqs[i],
+      pinHtml: this.makeRoutePinHtml(seqs[i], total),
+    }));
+  },
+
   /** 分天闭环：住宿出发 → 早 → 景点 → 午 → 景点 → 晚 → 回住宿 */
   buildDayRouteStops(day) {
     const start = day.day_start?.latlng;
-    if (!start) return [];
-    const stops = [];
+    if (!this.hasValidLatLng(start)) return [];
+    const raw = [];
     const add = (stop) => {
-      const prev = stops[stops.length - 1];
+      const prev = raw[raw.length - 1];
       if (prev && this.sameLatLng(prev.latlng, stop.latlng)) return;
-      stops.push(stop);
+      raw.push(stop);
     };
 
-    add({ id: 'stay', latlng: [...start], kind: 'stay', pinHtml: '<div class="route-node-pin is-first">住</div>' });
+    add({ id: 'stay', latlng: [...start], kind: 'stay' });
 
     const breakfast = day.meals?.breakfast;
-    if (breakfast?.anchor_latlng) {
-      add({ id: 'meal-breakfast', latlng: breakfast.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">早</div>' });
+    if (breakfast?.anchor_latlng && this.hasValidLatLng(breakfast.anchor_latlng)) {
+      add({ id: 'meal-breakfast', latlng: breakfast.anchor_latlng, kind: 'meal' });
     }
 
-    const attractions = (day.attractions || []).filter(a => a.latlng);
+    const attractions = (day.attractions || []).filter(a => this.hasValidLatLng(a.latlng));
     const lunch = day.meals?.lunch;
     const dinner = day.meals?.dinner;
     const lunchInsertAt = attractions.length ? Math.max(0, Math.ceil(attractions.length / 2) - 1) : -1;
 
     attractions.forEach((a, i) => {
-      add({
-        id: `attr-${i}`, latlng: a.latlng, kind: 'attraction',
-        pinHtml: `<div class="route-node-pin">${i + 1}</div>`,
-      });
-      if (lunch?.anchor_latlng && i === lunchInsertAt) {
-        add({ id: 'meal-lunch', latlng: lunch.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">午</div>' });
+      add({ id: `attr-${i}`, latlng: a.latlng, kind: 'attraction' });
+      if (lunch?.anchor_latlng && this.hasValidLatLng(lunch.anchor_latlng) && i === lunchInsertAt) {
+        add({ id: 'meal-lunch', latlng: lunch.anchor_latlng, kind: 'meal' });
       }
     });
 
-    if (lunch?.anchor_latlng && !attractions.length) {
-      add({ id: 'meal-lunch', latlng: lunch.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">午</div>' });
+    if (lunch?.anchor_latlng && this.hasValidLatLng(lunch.anchor_latlng) && !attractions.length) {
+      add({ id: 'meal-lunch', latlng: lunch.anchor_latlng, kind: 'meal' });
     }
 
-    if (dinner?.anchor_latlng) {
-      add({ id: 'meal-dinner', latlng: dinner.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">晚</div>' });
+    if (dinner?.anchor_latlng && this.hasValidLatLng(dinner.anchor_latlng)) {
+      add({ id: 'meal-dinner', latlng: dinner.anchor_latlng, kind: 'meal' });
     }
 
-    add({ id: 'stay-end', latlng: [...start], kind: 'stay', pinHtml: '<div class="route-node-pin is-last">返</div>' });
-    return stops;
+    add({ id: 'stay-end', latlng: [...start], kind: 'stay-end' });
+    return this.assignRoutePinLabels(raw);
   },
 
   drawDayRouteLoop(stops) {
@@ -709,22 +746,26 @@ const MapEngine = {
 
   renderOverview(data) {
     if (!data.nodes?.length || !this.map) return;
-    const geoPoints = [];
     this.overviewPinItems = this.buildOverviewStripItems(data);
-    data.nodes.forEach((n, idx) => {
-      if (!n.latlng) return;
-      geoPoints.push(n.latlng);
-      const pinClass = idx === 0 ? ' is-first' : idx === data.nodes.length - 1 ? ' is-last' : '';
-      this.createPin(n.latlng, `<div class="route-node-pin${pinClass}">${idx + 1}</div>`, `node-${idx}`, 900);
+    const routeNodes = this.collectRouteNodes(data);
+    const total = routeNodes.length;
+    const seqs = this.assertRouteSequence(routeNodes.map((_, i) => i + 1), 'overview');
+
+    routeNodes.forEach((n, i) => {
+      const seq = seqs[i];
+      this.createPin(n.latlng, this.makeRoutePinHtml(seq, total), `node-${n.origIdx}`, 900);
     });
-    for (let i = 0; i < geoPoints.length - 1; i++) {
-      const fromNode = data.nodes[i], toNode = data.nodes[i + 1];
-      const curve = this.generateGeodesicLinePoints(geoPoints[i], geoPoints[i + 1], 0.12);
+
+    for (let i = 0; i < routeNodes.length - 1; i++) {
+      const fromNode = routeNodes[i], toNode = routeNodes[i + 1];
+      const curve = this.generateGeodesicLinePoints(fromNode.latlng, toNode.latlng, 0.12);
       this.addPolylineWithFlow(curve);
       const seg = this.getSegmentBetween(fromNode.city, toNode.city, data.segment_transport);
       const mid = curve[Math.floor(curve.length / 2)];
-      if (seg) this.createPin(mid, '<div class="seg-mid-pin">↔</div>', `seg-${i}`, 600);
+      if (seg) this.createPin(mid, '<div class="seg-mid-pin">↔</div>', `seg-${fromNode.origIdx}`, 600);
     }
+
+    const geoPoints = routeNodes.map(n => n.latlng);
     if (geoPoints.length) {
       this.map.fitBounds(L.latLngBounds(geoPoints).pad(0.12), {
         ...this.mapFitPadding(),
@@ -852,8 +893,9 @@ const MapEngine = {
     this.clearLayers();
 
     const routeStops = this.buildDayRouteStops(day);
+    this.assertRouteSequence(routeStops.map(s => s.routeSeq), 'day');
     routeStops.forEach((stop) => {
-      const z = stop.kind === 'stay' ? 900 : stop.kind === 'meal' ? 700 : 850;
+      const z = stop.kind === 'stay' || stop.kind === 'stay-end' ? 900 : stop.kind === 'meal' ? 700 : 850;
       this.createPin(stop.latlng, stop.pinHtml, stop.id, z);
     });
     if (routeStops.length > 1) this.drawDayRouteLoop(routeStops);
