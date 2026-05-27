@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
-<title>Mappd · J人自由行时序决策沙盘</title>
+<title>Mappd · 旅游AI助手</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Noto+Serif+SC:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -66,16 +66,10 @@
   .logo-meta { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; color: var(--ink3); text-transform: uppercase; }
   .logo-meta strong { display: block; font-family: var(--serif); font-size: 18px; letter-spacing: -0.02em; color: var(--ink); text-transform: none; margin-top: 2px; font-weight: 600; }
   .welcome-hero {
-    font-family: var(--serif); font-size: 28px; line-height: 1.32; letter-spacing: -0.02em;
-    margin-bottom: 8px;
+    font-family: var(--serif); font-size: 28px; line-height: 1.28; letter-spacing: -0.02em;
+    margin-bottom: 28px; display: flex; flex-direction: column; gap: 2px;
   }
-  .welcome-lead { font-size: 13px; color: var(--ink2); margin-bottom: 28px; max-width: 32em; }
-  .ai-hint {
-    background: rgba(74, 91, 78, 0.08); border-left: 3px solid var(--accent);
-    padding: 12px 14px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    font-size: 12px; color: var(--ink2); margin-bottom: 24px; line-height: 1.5;
-  }
-  .ai-hint em { font-style: normal; color: var(--accent); font-weight: 600; }
+  .welcome-hero .hero-line { display: block; }
   .field-block { margin-bottom: 14px; }
   .field-label {
     font-family: var(--mono); font-size: 10px; font-weight: 500;
@@ -132,8 +126,15 @@
     flex: 1; min-height: 180px; position: relative; background: #E8E2D5;
     border-bottom: 1px solid var(--border);
   }
-  .app-overview .map-zone { flex: 1; min-height: 36dvh; }
+  .app-overview .map-zone {
+    flex: 0 0 40dvh; min-height: 220px; max-height: 44dvh;
+  }
   .app-days .map-zone { flex: 1; min-height: 28dvh; }
+  .overview-scroll-panel {
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+  }
   #map { position: absolute; inset: 0; z-index: 1; background: #E8E2D5; }
   .map-placeholder {
     position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column;
@@ -155,29 +156,50 @@
     -webkit-tap-highlight-color: transparent;
   }
   .day-tab.active { background: var(--ink); color: #fff; }
-  .plans-carousel-wrap {
-    flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border2);
-    padding: 12px 0 calc(8px + var(--safe-bottom));
-  }
-  .plans-carousel-hint {
+  .panel-hint {
     font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--ink3); padding: 0 16px 8px;
+    color: var(--ink3); padding: 10px 16px 6px;
   }
   .plans-carousel {
-    display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
-    padding: 0 16px 4px; -webkit-overflow-scrolling: touch;
+    display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory;
+    padding: 4px 16px 12px; -webkit-overflow-scrolling: touch;
+    background: transparent;
   }
   .plans-carousel::-webkit-scrollbar { display: none; }
   .plan-slide {
-    flex: 0 0 calc(100vw - 48px); max-width: 360px; scroll-snap-align: center;
+    flex: 0 0 calc(100vw - 52px); max-width: 360px; scroll-snap-align: center;
+    background: transparent;
   }
-  .cta-days {
-    margin: 10px 16px 0; width: calc(100% - 32px); min-height: 48px; border: none;
-    border-radius: 999px; background: var(--accent); color: #fff;
-    font-size: 14px; font-weight: 600; cursor: pointer;
+  .nodes-section { padding-bottom: 12px; border-top: 1px dashed var(--border2); margin-top: 4px; }
+  .nodes-carousel {
+    display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
+    padding: 4px 16px 8px; -webkit-overflow-scrolling: touch;
+  }
+  .nodes-carousel::-webkit-scrollbar { display: none; }
+  .node-detail-card {
+    flex: 0 0 200px; scroll-snap-align: center;
+    background: #fff; border: 2px solid var(--border); border-radius: 12px;
+    padding: 12px; cursor: pointer; min-height: 100px;
+    transition: border-color 0.2s, box-shadow 0.2s;
     -webkit-tap-highlight-color: transparent;
   }
-  .cta-days:active { transform: scale(0.98); }
+  .node-detail-card.active {
+    border-color: var(--accent); background: var(--accent-light);
+    box-shadow: 0 0 0 3px rgba(74, 91, 78, 0.2);
+  }
+  .node-detail-card .strip-type { margin-bottom: 4px; }
+  .cta-sticky-bar {
+    flex-shrink: 0; padding: 10px 16px calc(10px + var(--safe-bottom));
+    background: rgba(253, 251, 247, 0.96); border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 24px rgba(26, 24, 20, 0.08);
+    z-index: 15;
+  }
+  .cta-days {
+    width: 100%; min-height: 50px; border: none; border-radius: 999px;
+    background: var(--ink); color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .cta-days:active { transform: scale(0.98); background: var(--accent); }
   .day-strip-panel {
     flex-shrink: 0; display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px calc(12px + var(--safe-bottom));
     background: var(--surface); border-top: 1px solid var(--border2);
@@ -204,6 +226,7 @@
   .plan-card {
     background: #fff; border: 2px solid var(--border); border-radius: var(--radius);
     padding: 16px; cursor: pointer; position: relative; height: 100%;
+    box-shadow: 0 4px 20px rgba(26, 24, 20, 0.06);
     transition: border-color 0.22s, box-shadow 0.22s, opacity 0.22s;
     -webkit-tap-highlight-color: transparent;
   }
@@ -580,7 +603,15 @@ const MapEngine = {
       const mid = curve[Math.floor(curve.length / 2)];
       if (seg) this.createPin(mid, '<div class="seg-mid-pin">↔</div>', `seg-${i}`, 600);
     }
-    if (geoPoints.length) this.map.fitBounds(L.latLngBounds(geoPoints).pad(0.35), this.mapFitPadding());
+    if (geoPoints.length) {
+      this.map.fitBounds(L.latLngBounds(geoPoints).pad(0.12), {
+        ...this.mapFitPadding(),
+        maxZoom: 10,
+        animate: true,
+      });
+    }
+    const nodeItems = this.overviewPinItems.filter(i => i.stripClass === 'node');
+    this.ui?.setOverviewNodes?.(nodeItems);
     setTimeout(() => this.map?.invalidateSize(), 80);
   },
 
@@ -714,7 +745,13 @@ const MapEngine = {
       this.createPin(slot.anchor_latlng, `<div class="seg-mid-pin">${label}</div>`, `meal-${key}`, 700);
     });
     this.renderStrip(items);
-    if (points.length) this.map.fitBounds(L.latLngBounds(points).pad(0.22), this.mapFitPadding());
+    if (points.length) {
+      this.map.fitBounds(L.latLngBounds(points).pad(0.15), {
+        ...this.mapFitPadding(),
+        maxZoom: 12,
+        animate: true,
+      });
+    }
   },
 
   switchDay(dayNum) {
@@ -731,7 +768,9 @@ const MapEngine = {
     this.selectedPlanIndex = idx;
     this.currentSkillResponse = this.planOptions[idx];
     this.dayDetailCache = {};
+    this.activeStripCardId = null;
     this.ui?.setSelectedPlan?.(idx);
+    this.ui?.setActiveStripId?.(null);
     this.clearLayers();
     this.closeSheet();
     if (this.uiMode === 'overview' && this.currentSkillResponse) {
@@ -782,11 +821,12 @@ function WelcomeScreen({ form, setForm, onSubmit, loading }) {
       <div className="welcome-inner">
         <div className="logo-row">
           <div className="logo-mark">M</div>
-          <div className="logo-meta">Mappd Mobile<strong>时序决策沙盘</strong></div>
+          <div className="logo-meta">Mappd Mobile<strong>旅游AI助手</strong></div>
         </div>
-        <h1 className="welcome-hero">把散乱攻略，收成一张能走的地图</h1>
-        <p className="welcome-lead">为 J 人自由行推演两套差异化动线——含决策逻辑、节点留宿与可执行的日级沙盘。</p>
-        <div className="ai-hint"><em>AI 推演</em> 会明确写出「选了什么、放弃了什么」——不是堆景点清单。</div>
+        <h1 className="welcome-hero">
+          <span className="hero-line">把散乱攻略</span>
+          <span className="hero-line">变成能走的地图</span>
+        </h1>
 
         <div className="field-row">
           <div className="field-block">
@@ -798,17 +838,18 @@ function WelcomeScreen({ form, setForm, onSubmit, loading }) {
             <input className="field-input" value={form.dest} onChange={e => setForm(f => ({ ...f, dest: e.target.value }))} />
           </div>
         </div>
+        <div className="field-block">
+          <label className="field-label">出发日期</label>
+          <input className="field-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+        </div>
         <div className="field-row">
           <div className="field-block">
-            <label className="field-label">出发日期</label>
-            <input className="field-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+            <label className="field-label">天数</label>
+            <input className="field-input" type="number" min="1" value={form.days} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} />
           </div>
           <div className="field-block">
-            <label className="field-label">天数 / 人数</label>
-            <div className="field-row">
-              <input className="field-input" type="number" min="1" value={form.days} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} />
-              <input className="field-input" type="number" min="1" value={form.travelers} onChange={e => setForm(f => ({ ...f, travelers: e.target.value }))} />
-            </div>
+            <label className="field-label">人数</label>
+            <input className="field-input" type="number" min="1" value={form.travelers} onChange={e => setForm(f => ({ ...f, travelers: e.target.value }))} />
           </div>
         </div>
 
@@ -832,7 +873,7 @@ function WelcomeScreen({ form, setForm, onSubmit, loading }) {
         </div>
 
         <button className="cta-primary" disabled={loading} onClick={onSubmit}>
-          {loading ? <span className="spinner" /> : <>推演两套路线 →</>}
+          {loading ? <span className="spinner" /> : '生成我的地图攻略'}
         </button>
       </div>
     </div>
@@ -873,18 +914,20 @@ function DetailSheet({ open, header, bodyHtml, onClose }) {
   );
 }
 
-function TripShell({ page, plans, selectedIdx, onSelectPlan, onBackToWelcome, onBackToOverview, onEnterDays, stripItems, activeStripId, dayNum, sheet, onCloseSheet }) {
+function TripShell({ page, plans, selectedIdx, onSelectPlan, onBackToWelcome, onBackToOverview, onEnterDays, stripItems, activeStripId, overviewNodes, dayNum, sheet, onCloseSheet }) {
   const carouselRef = useRef(null);
+  const nodesRef = useRef(null);
   const stripRef = useRef(null);
   const totalDays = parseInt(MapEngine.lastSearchPayload.days, 10) || 7;
   const selectedPlan = plans[selectedIdx];
 
   useEffect(() => {
     MapEngine.ui.scrollStripTo = (id) => {
-      const el = stripRef.current?.querySelector(`[data-strip-id="${id}"]`);
+      const panel = page === 'overview' ? nodesRef.current : stripRef.current;
+      const el = panel?.querySelector(`[data-strip-id="${id}"]`);
       el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     };
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     const el = carouselRef.current;
@@ -906,6 +949,20 @@ function TripShell({ page, plans, selectedIdx, onSelectPlan, onBackToWelcome, on
     if (best !== selectedIdx) onSelectPlan(best);
   };
 
+  const onNodeCarouselScroll = () => {
+    const el = nodesRef.current;
+    if (!el || !overviewNodes.length) return;
+    const center = el.scrollLeft + el.clientWidth / 2;
+    let best = overviewNodes[0]?.id, bestDist = Infinity;
+    [...el.children].forEach((child) => {
+      const id = child.dataset.stripId;
+      const mid = child.offsetLeft + child.offsetWidth / 2;
+      const d = Math.abs(mid - center);
+      if (d < bestDist) { bestDist = d; best = id; }
+    });
+    if (best && best !== activeStripId) MapEngine.highlightStrip(best, true);
+  };
+
   return (
     <div className={`app-trip ${page === 'overview' ? 'app-overview' : 'app-days'}`}>
       <header className="screen-header">
@@ -913,7 +970,7 @@ function TripShell({ page, plans, selectedIdx, onSelectPlan, onBackToWelcome, on
           {page === 'overview' ? (
             <>
               <h1>总路线规划</h1>
-              <p>左右滑动对比方案 · 地图同步动线</p>
+              <p>左右切换方案 · 上滑查看节点 · 地图固定不动</p>
             </>
           ) : (
             <>
@@ -941,17 +998,43 @@ function TripShell({ page, plans, selectedIdx, onSelectPlan, onBackToWelcome, on
       </div>
 
       {page === 'overview' && (
-        <div className="plans-carousel-wrap">
-          <div className="plans-carousel-hint">左右滑动 · 选择方案</div>
-          <div className="plans-carousel" ref={carouselRef} onScroll={onCarouselScroll}>
-            {plans.map((plan, idx) => (
-              <div key={idx} className="plan-slide">
-                <PlanCard plan={plan} idx={idx} selected={idx === selectedIdx} onSelect={onSelectPlan} />
+        <>
+          <div className="overview-scroll-panel">
+            <div className="panel-hint">左右滑动 · 切换方案</div>
+            <div className="plans-carousel" ref={carouselRef} onScroll={onCarouselScroll}>
+              {plans.map((plan, idx) => (
+                <div key={idx} className="plan-slide">
+                  <PlanCard plan={plan} idx={idx} selected={idx === selectedIdx} onSelect={onSelectPlan} />
+                </div>
+              ))}
+            </div>
+            {overviewNodes.length > 0 && (
+              <div className="nodes-section">
+                <div className="panel-hint">上滑至此 · 节点详情 · 左右滑动</div>
+                <div className="nodes-carousel" ref={nodesRef} onScroll={onNodeCarouselScroll}>
+                  {overviewNodes.map(item => (
+                    <div
+                      key={item.id}
+                      data-strip-id={item.id}
+                      className={`node-detail-card ${item.id === activeStripId ? 'active' : ''}`}
+                      onClick={() => {
+                        MapEngine.highlightStrip(item.id, true);
+                        if (item.onDetail) item.onDetail();
+                      }}
+                    >
+                      <div className="strip-type">{item.typeLabel}</div>
+                      <div className="strip-title">{item.title}</div>
+                      <div className="strip-body">{item.body}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            )}
           </div>
-          <button type="button" className="cta-days" onClick={onEnterDays}>查看分天行程 →</button>
-        </div>
+          <div className="cta-sticky-bar">
+            <button type="button" className="cta-days" onClick={onEnterDays}>查看分天行程</button>
+          </div>
+        </>
       )}
 
       {page === 'days' && (
@@ -985,12 +1068,14 @@ function App() {
   const [stripItems, setStripItems] = useState([]);
   const [activeStripId, setActiveStripId] = useState(null);
   const [dayNum, setDayNum] = useState(1);
+  const [overviewNodes, setOverviewNodes] = useState([]);
   const [sheet, setSheet] = useState({ open: false, header: null, body: '' });
 
   useEffect(() => {
     MapEngine.setUI({
       setStripItems,
       setActiveStripId,
+      setOverviewNodes,
       setDayNum,
       setSelectedPlan: setSelectedIdx,
       setUiMode: () => {},
@@ -1044,6 +1129,7 @@ function App() {
     setPage('welcome');
     setPlans([]);
     setStripItems([]);
+    setOverviewNodes([]);
     MapEngine.planOptions = [];
     MapEngine.uiMode = 'overview';
     if (MapEngine.map) {
@@ -1055,6 +1141,7 @@ function App() {
   const goBackToOverview = () => {
     setPage('overview');
     setStripItems([]);
+    setActiveStripId(null);
     MapEngine.leaveDayView();
   };
 
@@ -1079,6 +1166,7 @@ function App() {
           onEnterDays={enterDays}
           stripItems={stripItems}
           activeStripId={activeStripId}
+          overviewNodes={overviewNodes}
           dayNum={dayNum}
           sheet={sheet}
           onCloseSheet={() => MapEngine.closeSheet()}
