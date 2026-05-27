@@ -77,8 +77,25 @@ function parseRouteCities(routeOverview) {
     .filter(Boolean);
 }
 
+function normalizeLatlng(raw) {
+  if (raw == null) return null;
+  if (Array.isArray(raw) && raw.length >= 2) {
+    const a = +raw[0], b = +raw[1];
+    if (Number.isFinite(a) && Number.isFinite(b)) return [a, b];
+  }
+  if (typeof raw === 'object') {
+    const lat = raw.lat ?? raw.latitude;
+    const lng = raw.lng ?? raw.lon ?? raw.longitude;
+    if (lat != null && lng != null) {
+      const a = +lat, b = +lng;
+      if (Number.isFinite(a) && Number.isFinite(b)) return [a, b];
+    }
+  }
+  return null;
+}
+
 function hasValidLatlng(latlng) {
-  return Array.isArray(latlng) && latlng.length >= 2 && latlng.every(v => Number.isFinite(+v));
+  return normalizeLatlng(latlng) !== null;
 }
 
 /** 按 route_overview / 出发城市补全 nodes[].latlng，保证地图上至少 2 个可连线点 */
@@ -88,7 +105,8 @@ function enrichPlanNodes(plan, startPoint) {
   const start = startPoint || '';
 
   const fillNode = (n) => {
-    if (hasValidLatlng(n.latlng)) return n;
+    const normalized = normalizeLatlng(n.latlng);
+    if (normalized) return { ...n, latlng: normalized };
     const ll = lookupCityLatlng(n.city, start);
     return ll ? { ...n, latlng: [...ll] } : n;
   };

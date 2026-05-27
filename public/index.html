@@ -44,16 +44,16 @@
     overflow: hidden;
   }
   body.trip-active {
-    background: var(--surface);
+    background: #fff;
   }
-  body.trip-active::before { opacity: 0.15; }
+  body.trip-active::before { display: none; }
   body::before {
     content: '';
     position: fixed; inset: 0; pointer-events: none; z-index: 0;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
     opacity: 0.6;
   }
-  #root { position: relative; z-index: 1; display: flex; flex-direction: column; background: var(--surface); }
+  #root { position: relative; z-index: 1; display: flex; flex-direction: column; background: #fff; }
 
   .app-welcome {
     flex: 1; overflow-y: auto;
@@ -134,7 +134,7 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .app-trip { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--surface); }
+  .app-trip { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: #fff; }
   .screen-header {
     flex-shrink: 0; padding: 10px 16px; border-bottom: 1px solid var(--border2);
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -151,7 +151,7 @@
     flex: 1; min-height: 180px; position: relative; background: #E8E2D5;
     border-bottom: 1px solid var(--border);
   }
-  .app-overview { background: var(--surface); }
+  .app-overview { background: #fff; }
   .app-overview .map-zone {
     flex: 0 0 40dvh; min-height: 220px; max-height: 44dvh;
   }
@@ -160,7 +160,11 @@
     flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 0;
-    background: var(--surface);
+    background: #fff;
+  }
+  .overview-plans-zone {
+    flex-shrink: 0;
+    background: #fff;
   }
   #map { position: absolute; inset: 0; z-index: 1; background: #E8E2D5; }
   .map-placeholder {
@@ -186,19 +190,19 @@
   .panel-hint {
     font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--ink3); padding: 10px 16px 6px;
-    background: var(--surface);
+    background: #fff;
   }
   .plans-carousel {
     display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory;
     padding: 4px 16px 12px; -webkit-overflow-scrolling: touch;
-    background: var(--surface);
+    background: #fff;
   }
   .plans-carousel::-webkit-scrollbar { display: none; }
   .plan-slide {
     flex: 0 0 calc(100vw - 52px); max-width: 360px; scroll-snap-align: center;
-    background: var(--surface);
+    background: #fff;
   }
-  .nodes-section { padding-bottom: 12px; border-top: 1px dashed var(--border2); margin-top: 4px; background: var(--surface); }
+  .nodes-section { padding-bottom: 12px; border-top: 1px dashed var(--border2); margin-top: 4px; background: #fff; }
   .nodes-carousel {
     display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
     padding: 4px 16px 8px; -webkit-overflow-scrolling: touch;
@@ -276,7 +280,11 @@
     transition: border-color 0.22s, box-shadow 0.22s, opacity 0.22s;
     -webkit-tap-highlight-color: transparent;
   }
-  .plan-card:not(.selected) { opacity: 0.88; }
+  .plan-card:not(.selected) {
+    opacity: 1;
+    border-color: var(--border2);
+    box-shadow: 0 2px 12px rgba(26, 24, 20, 0.04);
+  }
   .plan-card.selected {
     border-color: var(--accent); box-shadow: 0 8px 28px rgba(74, 91, 78, 0.14);
     background: linear-gradient(180deg, #fff 0%, var(--accent-light) 100%);
@@ -628,18 +636,23 @@ const MapEngine = {
 
   buildOverviewStripItems(data) {
     const items = [];
+    const routeNodes = this.collectRouteNodes(data);
+    const seqByOrig = new Map(routeNodes.map(n => [n.origIdx, n.routeSeq]));
     const nodes = data.nodes || [];
     nodes.forEach((n, idx) => {
+      const routeSeq = seqByOrig.get(idx);
+      if (!routeSeq) return;
       const details = this.buildNodeDetailBlocks(n, idx, data);
       items.push({
-        id: `node-${idx}`, stripClass: 'node', typeLabel: `节点 ${idx + 1}`,
+        id: `node-${idx}`, stripClass: 'node', typeLabel: `节点 ${routeSeq}`,
         title: n.city, body: '', details, latlng: n.latlng,
       });
-      if (idx < nodes.length - 1) {
-        const seg = this.getSegmentBetween(n.city, nodes[idx + 1].city, data.segment_transport);
+      const nextIdx = nodes.findIndex((nn, j) => j > idx && seqByOrig.has(j));
+      if (nextIdx >= 0) {
+        const seg = this.getSegmentBetween(n.city, nodes[nextIdx].city, data.segment_transport);
         items.push({
           id: `seg-${idx}`, stripClass: 'segment', typeLabel: '城际转场',
-          title: `${n.city} → ${nodes[idx + 1].city}`,
+          title: `${n.city} → ${nodes[nextIdx].city}`,
           body: '', details: this.buildSegmentDetailBlocks(seg), latlng: null,
         });
       }
@@ -686,8 +699,47 @@ const MapEngine = {
     return Math.abs(+a[0] - +b[0]) < 0.00015 && Math.abs(+a[1] - +b[1]) < 0.00015;
   },
 
+  normalizeLatLng(raw) {
+    if (raw == null) return null;
+    if (Array.isArray(raw) && raw.length >= 2) {
+      const a = +raw[0], b = +raw[1];
+      if (Number.isFinite(a) && Number.isFinite(b)) return [a, b];
+    }
+    if (typeof raw === 'object') {
+      const lat = raw.lat ?? raw.latitude;
+      const lng = raw.lng ?? raw.lon ?? raw.longitude;
+      if (lat != null && lng != null) {
+        const a = +lat, b = +lng;
+        if (Number.isFinite(a) && Number.isFinite(b)) return [a, b];
+      }
+    }
+    if (typeof raw === 'string' && raw.includes(',')) {
+      const parts = raw.split(',').map(s => +s.trim());
+      if (parts.length >= 2 && parts.every(Number.isFinite)) return [parts[0], parts[1]];
+    }
+    return null;
+  },
+
   hasValidLatLng(latlng) {
-    return Array.isArray(latlng) && latlng.length >= 2 && latlng.every(v => Number.isFinite(+v));
+    return this.normalizeLatLng(latlng) !== null;
+  },
+
+  /** 同城重复坐标时错开 pin，避免 1 被终点盖住只看到 2 */
+  withDisplayLatLng(nodes) {
+    const keyCounts = {};
+    return nodes.map((n) => {
+      const latlng = this.normalizeLatLng(n.latlng) || n.latlng;
+      const key = `${(+latlng[0]).toFixed(4)}_${(+latlng[1]).toFixed(4)}`;
+      const stack = keyCounts[key] || 0;
+      keyCounts[key] = stack + 1;
+      if (stack === 0) return { ...n, latlng, displayLatlng: latlng };
+      const bump = stack * 0.22;
+      return {
+        ...n,
+        latlng,
+        displayLatlng: [latlng[0] + bump * 0.01, latlng[1] + bump * 0.008],
+      };
+    });
   },
 
   /** 按 route_overview / 出发城市补全 latlng，避免方案 B 等只剩单点无法画线 */
@@ -697,7 +749,8 @@ const MapEngine = {
     const start = this.lastSearchPayload.start_point || '';
 
     const fillNode = (n) => {
-      if (this.hasValidLatLng(n.latlng)) return n;
+      const normalized = this.normalizeLatLng(n.latlng);
+      if (normalized) return { ...n, latlng: normalized };
       const ll = lookupCityLatlng(n.city, start);
       return ll ? { ...n, latlng: [...ll] } : n;
     };
@@ -753,12 +806,18 @@ const MapEngine = {
     return enriched;
   },
 
-  /** 收集有效节点并保留原始下标 */
+  /** 收集可绘制的节点，强制 routeSeq 从 1 连续递增 */
   collectRouteNodes(data) {
-    return (data.nodes || [])
-      .map((n, origIdx) => ({ node: n, origIdx }))
-      .filter(({ node }) => this.hasValidLatLng(node.latlng))
-      .map(({ node, origIdx }) => ({ ...node, origIdx }));
+    const filtered = (data.nodes || [])
+      .map((n, origIdx) => {
+        const latlng = this.normalizeLatLng(n.latlng);
+        return latlng ? { ...n, origIdx, latlng } : null;
+      })
+      .filter(Boolean);
+    return this.withDisplayLatLng(filtered).map((n, i) => ({
+      ...n,
+      routeSeq: i + 1,
+    }));
   },
 
   /** 生成 1…N 连续编号的地图 pin */
@@ -863,18 +922,21 @@ const MapEngine = {
 
   renderOverview(data) {
     if (!this.map) return;
+    this.clearLayers();
     const plan = this.ensurePlanGeo({ ...data });
     if (!plan.nodes?.length) return;
     this.currentSkillResponse = plan;
     this.planOptions[this.selectedPlanIndex] = plan;
-    this.overviewPinItems = this.buildOverviewStripItems(plan);
     const routeNodes = this.collectRouteNodes(plan);
     const total = routeNodes.length;
-    const seqs = this.assertRouteSequence(routeNodes.map((_, i) => i + 1), 'overview');
+    if (!total) return;
+    this.assertRouteSequence(routeNodes.map(n => n.routeSeq), 'overview');
+    this.overviewPinItems = this.buildOverviewStripItems(plan);
 
-    routeNodes.forEach((n, i) => {
-      const seq = seqs[i];
-      this.createPin(n.latlng, this.makeRoutePinHtml(seq, total), `node-${n.origIdx}`, 900);
+    routeNodes.forEach((n) => {
+      const seq = n.routeSeq;
+      const pinLatlng = n.displayLatlng || n.latlng;
+      this.createPin(pinLatlng, this.makeRoutePinHtml(seq, total), `node-${n.origIdx}`, 900);
     });
 
     for (let i = 0; i < routeNodes.length - 1; i++) {
@@ -1080,6 +1142,7 @@ const MapEngine = {
     this.selectPlan(idx);
     setTimeout(() => {
       this.initMap();
+      this.clearLayers();
       this.renderOverview(this.planOptions[idx]);
       this.ensureDayLoaded(1).catch(() => {});
     }, 120);
@@ -1301,13 +1364,15 @@ function TripShell({ page, plans, selectedIdx, onSelectPlan, onBackToWelcome, on
       {page === 'overview' && (
         <>
           <div className="overview-scroll-panel">
-            <div className="panel-hint">左右滑动 · 切换方案</div>
-            <div className="plans-carousel" ref={carouselRef} onScroll={onCarouselScroll}>
-              {plans.map((plan, idx) => (
-                <div key={idx} className="plan-slide">
-                  <PlanCard plan={plan} idx={idx} selected={idx === selectedIdx} onSelect={onSelectPlan} />
-                </div>
-              ))}
+            <div className="overview-plans-zone">
+              <div className="panel-hint">左右滑动 · 切换方案</div>
+              <div className="plans-carousel" ref={carouselRef} onScroll={onCarouselScroll}>
+                {plans.map((plan, idx) => (
+                  <div key={idx} className="plan-slide">
+                    <PlanCard plan={plan} idx={idx} selected={idx === selectedIdx} onSelect={onSelectPlan} />
+                  </div>
+                ))}
+              </div>
             </div>
             {overviewNodes.length > 0 && (
               <div className="nodes-section">
