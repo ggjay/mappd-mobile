@@ -27,7 +27,115 @@ function extractOptions(parsed) {
   return [];
 }
 
-function normalizePlan(raw, index) {
+/** 常用中国城市坐标 [纬度, 经度]，用于 AI 漏填 latlng 时补全动线 */
+const CITY_LATLNG = {
+  上海: [31.2304, 121.4737], 北京: [39.9042, 116.4074], 广州: [23.1291, 113.2644],
+  深圳: [22.5431, 114.0579], 成都: [30.5728, 104.0668], 杭州: [30.2741, 120.1551],
+  南京: [32.0603, 118.7969], 武汉: [30.5928, 114.3055], 西安: [34.3416, 108.9398],
+  重庆: [29.563, 106.5516], 天津: [39.3434, 117.3616], 苏州: [31.2989, 120.5853],
+  厦门: [24.4798, 118.0894], 青岛: [36.0671, 120.3826], 大连: [38.914, 121.6147],
+  昆明: [25.0389, 102.7183], 大理: [25.6065, 100.2676], 丽江: [26.855, 100.2277],
+  香格里拉: [27.8258, 99.7065], 迪庆: [27.8258, 99.7065], 西双版纳: [22.0094, 100.7974],
+  景洪: [22.0094, 100.7974], 腾冲: [25.017, 98.4907], 贵阳: [26.647, 106.6302],
+  长沙: [28.2282, 112.9388], 福州: [26.0745, 119.2965], 海口: [20.044, 110.1999],
+  三亚: [18.2528, 109.5119], 哈尔滨: [45.8038, 126.535], 沈阳: [41.8057, 123.4315],
+  郑州: [34.7466, 113.6254], 济南: [36.6512, 117.1201], 合肥: [31.8206, 117.2272],
+  南昌: [28.682, 115.8579], 太原: [37.8706, 112.5489], 兰州: [36.0611, 103.8343],
+  乌鲁木齐: [43.8256, 87.6168], 拉萨: [29.652, 91.1721], 香港: [22.3193, 114.1694],
+  澳门: [22.1987, 113.5439], 台北: [25.033, 121.5654],
+};
+
+function stripCitySuffix(name) {
+  return (name || '').replace(/[省市区县州盟]$/, '').trim();
+}
+
+function cityNameMatch(a, b) {
+  const na = stripCitySuffix(a);
+  const nb = stripCitySuffix(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function lookupCityLatlng(city, fallbackCity) {
+  const raw = (city || '').trim();
+  if (!raw) return fallbackCity ? lookupCityLatlng(fallbackCity) : null;
+  if (CITY_LATLNG[raw]) return CITY_LATLNG[raw];
+  const short = stripCitySuffix(raw);
+  if (CITY_LATLNG[short]) return CITY_LATLNG[short];
+  for (const [key, coords] of Object.entries(CITY_LATLNG)) {
+    if (raw.includes(key) || key.includes(short)) return coords;
+  }
+  return fallbackCity && !cityNameMatch(city, fallbackCity)
+    ? lookupCityLatlng(fallbackCity)
+    : null;
+}
+
+function parseRouteCities(routeOverview) {
+  return (routeOverview || '')
+    .split(/(?:→|->|—|–|-|至|到|→)/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function hasValidLatlng(latlng) {
+  return Array.isArray(latlng) && latlng.length >= 2 && latlng.every(v => Number.isFinite(+v));
+}
+
+/** 按 route_overview / 出发城市补全 nodes[].latlng，保证地图上至少 2 个可连线点 */
+function enrichPlanNodes(plan, startPoint) {
+  const nodes = Array.isArray(plan.nodes) ? plan.nodes.map(n => ({ ...n })) : [];
+  const routeCities = parseRouteCities(plan.route_overview);
+  const start = startPoint || '';
+
+  const fillNode = (n) => {
+    if (hasValidLatlng(n.latlng)) return n;
+    const ll = lookupCityLatlng(n.city, start);
+    return ll ? { ...n, latlng: [...ll] } : n;
+  };
+
+  let working = nodes.map(fillNode);
+  const geoCount = () => working.filter(n => hasValidLatlng(n.latlng)).length;
+
+  if (routeCities.length >= 2 && geoCount() < 2) {
+    working = routeCities.map((city) => {
+      const existing = nodes.find(n => cityNameMatch(n.city, city));
+      const ll = existing && hasValidLatlng(existing.latlng)
+        ? existing.latlng
+        : lookupCityLatlng(city, start);
+      if (!ll) return null;
+      return {
+        city,
+        nights: existing?.nights ?? 1,
+        core_value: existing?.core_value || '',
+        latlng: [...ll],
+      };
+    }).filter(Boolean);
+  } else if (routeCities.length >= 2 && geoCount() < routeCities.length) {
+    const merged = [];
+    routeCities.forEach((city) => {
+      const existing = working.find(n => cityNameMatch(n.city, city))
+        || nodes.find(n => cityNameMatch(n.city, city));
+      const ll = existing && hasValidLatlng(fillNode(existing).latlng)
+        ? fillNode(existing).latlng
+        : lookupCityLatlng(city, start);
+      if (!ll) return;
+      merged.push({
+        city,
+        nights: existing?.nights ?? 1,
+        core_value: existing?.core_value || '',
+        latlng: [...ll],
+      });
+    });
+    if (merged.length >= geoCount()) working = merged;
+  } else {
+    working = working.map(fillNode);
+  }
+
+  plan.nodes = working;
+  return plan;
+}
+
+function normalizePlan(raw, index, startPoint) {
   const plan = typeof raw === 'object' && raw !== null ? { ...raw } : {};
   const label = plan.option_label || `方案 ${String.fromCharCode(65 + index)}`;
 
@@ -55,7 +163,7 @@ function normalizePlan(raw, index) {
   };
   plan.peak_season_alert = plan.peak_season_alert || '';
 
-  return plan;
+  return enrichPlanNodes(plan, startPoint);
 }
 
 const FALLBACK_PLAN = {
@@ -185,10 +293,10 @@ ${transportConstraint}
       options = [parsed];
     }
 
-    options = options.slice(0, 2).map((opt, i) => normalizePlan(opt, i));
+    options = options.slice(0, 2).map((opt, i) => normalizePlan(opt, i, start_point));
 
     if (options.length === 1) {
-      const alt = normalizePlan({ ...options[0], option_label: '方案 B' }, 1);
+      const alt = normalizePlan({ ...options[0], option_label: '方案 B' }, 1, start_point);
       alt.headline = alt.headline === options[0].headline
         ? `${alt.headline}（备选）`
         : alt.headline;

@@ -43,13 +43,17 @@
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
+  body.trip-active {
+    background: var(--surface);
+  }
+  body.trip-active::before { opacity: 0.15; }
   body::before {
     content: '';
     position: fixed; inset: 0; pointer-events: none; z-index: 0;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
     opacity: 0.6;
   }
-  #root { position: relative; z-index: 1; display: flex; flex-direction: column; }
+  #root { position: relative; z-index: 1; display: flex; flex-direction: column; background: var(--surface); }
 
   .app-welcome {
     flex: 1; overflow-y: auto;
@@ -130,7 +134,7 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .app-trip { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .app-trip { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; background: var(--surface); }
   .screen-header {
     flex-shrink: 0; padding: 10px 16px; border-bottom: 1px solid var(--border2);
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -156,7 +160,7 @@
     flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 0;
-    background: transparent;
+    background: var(--surface);
   }
   #map { position: absolute; inset: 0; z-index: 1; background: #E8E2D5; }
   .map-placeholder {
@@ -182,18 +186,19 @@
   .panel-hint {
     font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--ink3); padding: 10px 16px 6px;
+    background: var(--surface);
   }
   .plans-carousel {
     display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory;
     padding: 4px 16px 12px; -webkit-overflow-scrolling: touch;
-    background: transparent;
+    background: var(--surface);
   }
   .plans-carousel::-webkit-scrollbar { display: none; }
   .plan-slide {
     flex: 0 0 calc(100vw - 52px); max-width: 360px; scroll-snap-align: center;
-    background: transparent;
+    background: var(--surface);
   }
-  .nodes-section { padding-bottom: 12px; border-top: 1px dashed var(--border2); margin-top: 4px; background: transparent; }
+  .nodes-section { padding-bottom: 12px; border-top: 1px dashed var(--border2); margin-top: 4px; background: var(--surface); }
   .nodes-carousel {
     display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
     padding: 4px 16px 8px; -webkit-overflow-scrolling: touch;
@@ -400,6 +405,55 @@ function getPlanHeadline(plan) {
   return plan.headline || plan.title || plan.plan_title
     || (plan.option_label?.includes('·') ? plan.option_label.split('·').slice(1).join('·').trim() : plan.option_label)
     || plan.route_overview || '推荐路线';
+}
+
+const CITY_LATLNG = {
+  上海: [31.2304, 121.4737], 北京: [39.9042, 116.4074], 广州: [23.1291, 113.2644],
+  深圳: [22.5431, 114.0579], 成都: [30.5728, 104.0668], 杭州: [30.2741, 120.1551],
+  南京: [32.0603, 118.7969], 武汉: [30.5928, 114.3055], 西安: [34.3416, 108.9398],
+  重庆: [29.563, 106.5516], 天津: [39.3434, 117.3616], 苏州: [31.2989, 120.5853],
+  厦门: [24.4798, 118.0894], 青岛: [36.0671, 120.3826], 大连: [38.914, 121.6147],
+  昆明: [25.0389, 102.7183], 大理: [25.6065, 100.2676], 丽江: [26.855, 100.2277],
+  香格里拉: [27.8258, 99.7065], 迪庆: [27.8258, 99.7065], 西双版纳: [22.0094, 100.7974],
+  景洪: [22.0094, 100.7974], 腾冲: [25.017, 98.4907], 贵阳: [26.647, 106.6302],
+  长沙: [28.2282, 112.9388], 福州: [26.0745, 119.2965], 海口: [20.044, 110.1999],
+  三亚: [18.2528, 109.5119], 哈尔滨: [45.8038, 126.535], 沈阳: [41.8057, 123.4315],
+  郑州: [34.7466, 113.6254], 济南: [36.6512, 117.1201], 合肥: [31.8206, 117.2272],
+  南昌: [28.682, 115.8579], 太原: [37.8706, 112.5489], 兰州: [36.0611, 103.8343],
+  乌鲁木齐: [43.8256, 87.6168], 拉萨: [29.652, 91.1721], 香港: [22.3193, 114.1694],
+  澳门: [22.1987, 113.5439], 台北: [25.033, 121.5654],
+};
+
+function stripCitySuffix(name) {
+  return (name || '').replace(/[省市区县州盟]$/, '').trim();
+}
+
+function cityNameMatch(a, b) {
+  const na = stripCitySuffix(a);
+  const nb = stripCitySuffix(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function lookupCityLatlng(city, fallbackCity) {
+  const raw = (city || '').trim();
+  if (!raw) return fallbackCity ? lookupCityLatlng(fallbackCity) : null;
+  if (CITY_LATLNG[raw]) return CITY_LATLNG[raw];
+  const short = stripCitySuffix(raw);
+  if (CITY_LATLNG[short]) return CITY_LATLNG[short];
+  for (const [key, coords] of Object.entries(CITY_LATLNG)) {
+    if (raw.includes(key) || key.includes(short)) return coords;
+  }
+  return fallbackCity && !cityNameMatch(city, fallbackCity)
+    ? lookupCityLatlng(fallbackCity)
+    : null;
+}
+
+function parseRouteCities(routeOverview) {
+  return (routeOverview || '')
+    .split(/(?:→|->|—|–|-|至|到)/)
+    .map(s => s.trim())
+    .filter(Boolean);
 }
 
 /* —— Map engine (Leaflet) —— */
@@ -636,6 +690,69 @@ const MapEngine = {
     return Array.isArray(latlng) && latlng.length >= 2 && latlng.every(v => Number.isFinite(+v));
   },
 
+  /** 按 route_overview / 出发城市补全 latlng，避免方案 B 等只剩单点无法画线 */
+  ensurePlanGeo(plan) {
+    const nodes = Array.isArray(plan.nodes) ? plan.nodes.map(n => ({ ...n })) : [];
+    const routeCities = parseRouteCities(plan.route_overview);
+    const start = this.lastSearchPayload.start_point || '';
+
+    const fillNode = (n) => {
+      if (this.hasValidLatLng(n.latlng)) return n;
+      const ll = lookupCityLatlng(n.city, start);
+      return ll ? { ...n, latlng: [...ll] } : n;
+    };
+
+    let working = nodes.map(fillNode);
+    const geoCount = () => working.filter(n => this.hasValidLatLng(n.latlng)).length;
+
+    if (routeCities.length >= 2 && geoCount() < 2) {
+      working = routeCities.map((city) => {
+        const existing = nodes.find(n => cityNameMatch(n.city, city));
+        const ll = existing && this.hasValidLatLng(existing.latlng)
+          ? existing.latlng
+          : lookupCityLatlng(city, start);
+        if (!ll) return null;
+        return {
+          city,
+          nights: existing?.nights ?? 1,
+          core_value: existing?.core_value || '',
+          latlng: [...ll],
+        };
+      }).filter(Boolean);
+    } else if (routeCities.length >= 2 && geoCount() < routeCities.length) {
+      const merged = [];
+      routeCities.forEach((city) => {
+        const existing = working.find(n => cityNameMatch(n.city, city))
+          || nodes.find(n => cityNameMatch(n.city, city));
+        const filled = existing ? fillNode(existing) : null;
+        const ll = filled && this.hasValidLatLng(filled.latlng)
+          ? filled.latlng
+          : lookupCityLatlng(city, start);
+        if (!ll) return;
+        merged.push({
+          city,
+          nights: existing?.nights ?? 1,
+          core_value: existing?.core_value || '',
+          latlng: [...ll],
+        });
+      });
+      if (merged.length >= geoCount()) working = merged;
+    } else {
+      working = working.map(fillNode);
+    }
+
+    const enriched = { ...plan, nodes: working };
+    const pts = working.filter(n => this.hasValidLatLng(n.latlng));
+    if (pts.length < 2 && routeCities.length >= 2) {
+      console.warn('[Mappd] 动线地理点不足，无法绘制连线', {
+        plan: plan.option_label,
+        routeCities,
+        geoPoints: pts.length,
+      });
+    }
+    return enriched;
+  },
+
   /** 收集有效节点并保留原始下标 */
   collectRouteNodes(data) {
     return (data.nodes || [])
@@ -745,9 +862,13 @@ const MapEngine = {
   },
 
   renderOverview(data) {
-    if (!data.nodes?.length || !this.map) return;
-    this.overviewPinItems = this.buildOverviewStripItems(data);
-    const routeNodes = this.collectRouteNodes(data);
+    if (!this.map) return;
+    const plan = this.ensurePlanGeo({ ...data });
+    if (!plan.nodes?.length) return;
+    this.currentSkillResponse = plan;
+    this.planOptions[this.selectedPlanIndex] = plan;
+    this.overviewPinItems = this.buildOverviewStripItems(plan);
+    const routeNodes = this.collectRouteNodes(plan);
     const total = routeNodes.length;
     const seqs = this.assertRouteSequence(routeNodes.map((_, i) => i + 1), 'overview');
 
@@ -760,7 +881,7 @@ const MapEngine = {
       const fromNode = routeNodes[i], toNode = routeNodes[i + 1];
       const curve = this.generateGeodesicLinePoints(fromNode.latlng, toNode.latlng, 0.12);
       this.addPolylineWithFlow(curve);
-      const seg = this.getSegmentBetween(fromNode.city, toNode.city, data.segment_transport);
+      const seg = this.getSegmentBetween(fromNode.city, toNode.city, plan.segment_transport);
       const mid = curve[Math.floor(curve.length / 2)];
       if (seg) this.createPin(mid, '<div class="seg-mid-pin">↔</div>', `seg-${fromNode.origIdx}`, 600);
     }
@@ -918,7 +1039,9 @@ const MapEngine = {
 
   selectPlan(idx) {
     this.selectedPlanIndex = idx;
-    this.currentSkillResponse = this.planOptions[idx];
+    const enriched = this.ensurePlanGeo({ ...this.planOptions[idx] });
+    this.planOptions[idx] = enriched;
+    this.currentSkillResponse = enriched;
     this.dayDetailCache = {};
     this.activeStripCardId = null;
     this.ui?.setSelectedPlan?.(idx);
@@ -1243,6 +1366,11 @@ function App() {
   const [sheet, setSheet] = useState({ open: false, header: null, body: '' });
 
   useEffect(() => {
+    document.body.classList.toggle('trip-active', page !== 'welcome');
+    return () => document.body.classList.remove('trip-active');
+  }, [page]);
+
+  useEffect(() => {
     MapEngine.setUI({
       setStripItems,
       setActiveStripId,
@@ -1284,7 +1412,8 @@ function App() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      const options = data.options || [];
+      MapEngine.lastSearchPayload = payload;
+      const options = (data.options || []).map((p) => MapEngine.ensurePlanGeo({ ...p }));
       if (!options.length) throw new Error('empty');
       setPlans(options);
       setPage('overview');
