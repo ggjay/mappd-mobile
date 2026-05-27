@@ -84,6 +84,27 @@
   }
   .field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74, 91, 78, 0.12); }
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* 出发日期占满一行，天数/人数各占半列 —— 同一 grid 保证左右边缘对齐 */
+  .field-grid-trip {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 10px;
+    row-gap: 14px;
+    margin-bottom: 14px;
+  }
+  .field-grid-trip .field-block { margin-bottom: 0; min-width: 0; }
+  .field-grid-trip .field-input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .field-grid-trip .field-date { grid-column: 1 / -1; }
+  .field-grid-trip .field-input[type="date"] {
+    display: block;
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 46px;
+  }
   .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; }
   .chip {
     padding: 10px 14px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
@@ -838,11 +859,11 @@ function WelcomeScreen({ form, setForm, onSubmit, loading }) {
             <input className="field-input" value={form.dest} onChange={e => setForm(f => ({ ...f, dest: e.target.value }))} />
           </div>
         </div>
-        <div className="field-block">
-          <label className="field-label">出发日期</label>
-          <input className="field-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-        </div>
-        <div className="field-row">
+        <div className="field-grid-trip">
+          <div className="field-block field-date">
+            <label className="field-label">出发日期</label>
+            <input className="field-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+          </div>
           <div className="field-block">
             <label className="field-label">天数</label>
             <input className="field-input" type="number" min="1" value={form.days} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} />
