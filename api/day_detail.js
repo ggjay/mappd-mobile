@@ -48,20 +48,6 @@ function densityRules(density) {
   return '中密度：3个景点，节奏适中';
 }
 
-async function fetchWikiThumb(title) {
-  try {
-    const res = await fetch(
-      `https://zh.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-      { headers: { 'User-Agent': 'Mappd/1.0' } },
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.thumbnail?.source || data.originalimage?.source || null;
-  } catch {
-    return null;
-  }
-}
-
 function baikeItemUrl(name) {
   return `https://baike.baidu.com/item/${encodeURIComponent(name.replace(/\s/g, ''))}`;
 }
@@ -210,15 +196,11 @@ function normalizeDayStart(raw, dayNum, destination, plan, rawAttractions) {
 async function normalizeAttraction(a, dayNum, index) {
   const name = a.name || '景点';
   const baikeUrl = a.baike_url || baikeItemUrl(name);
-  let cover = a.cover_image || '';
-  if (!cover || cover.includes('placehold')) {
-    cover = (await fetchWikiThumb(name)) || '';
-  }
   return {
     id: a.id || `d${dayNum}_a${index + 1}`,
     name,
     latlng: Array.isArray(a.latlng) ? a.latlng : (a.lat != null ? [a.lat, a.lng] : [25.04, 102.73]),
-    cover_image: cover,
+    cover_image: a.cover_image && !String(a.cover_image).includes('placehold') ? a.cover_image : '',
     hours: a.hours || '全天开放',
     highlights: a.highlights || '',
     baike_summary: a.baike_summary || a.highlights || `${name}是当地知名游览目的地，详见百度百科词条介绍。`,

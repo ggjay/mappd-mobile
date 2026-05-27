@@ -615,14 +615,96 @@ const MapEngine = {
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   },
 
-  addPolylineWithFlow(curvePoints) {
-    const line = L.polyline(curvePoints, { color: '#4A5B4E', weight: 5, opacity: 0.88, lineCap: 'round', lineJoin: 'round' });
+  addPolylineWithFlow(curvePoints, color = '#4A5B4E') {
+    const line = L.polyline(curvePoints, { color, weight: 5, opacity: 0.88, lineCap: 'round', lineJoin: 'round' });
     this.addLayer(line);
     if (typeof L.polylineDecorator === 'function') {
       this.addLayer(L.polylineDecorator(line, {
-        patterns: [{ offset: '12%', repeat: '28%', symbol: L.Symbol.arrowHead({ pixelSize: 11, headAngle: 40, polygon: false, pathOptions: { stroke: true, weight: 3, color: '#4A5B4E', opacity: 0.95 } }) }],
+        patterns: [{ offset: '12%', repeat: '28%', symbol: L.Symbol.arrowHead({ pixelSize: 11, headAngle: 40, polygon: false, pathOptions: { stroke: true, weight: 3, color, opacity: 0.95 } }) }],
       }));
     }
+  },
+
+  sameLatLng(a, b) {
+    if (!a || !b) return false;
+    return Math.abs(+a[0] - +b[0]) < 0.00015 && Math.abs(+a[1] - +b[1]) < 0.00015;
+  },
+
+  /** 分天闭环：住宿出发 → 早 → 景点 → 午 → 景点 → 晚 → 回住宿 */
+  buildDayRouteStops(day) {
+    const start = day.day_start?.latlng;
+    if (!start) return [];
+    const stops = [];
+    const add = (stop) => {
+      const prev = stops[stops.length - 1];
+      if (prev && this.sameLatLng(prev.latlng, stop.latlng)) return;
+      stops.push(stop);
+    };
+
+    add({ id: 'stay', latlng: [...start], kind: 'stay', pinHtml: '<div class="route-node-pin is-first">住</div>' });
+
+    const breakfast = day.meals?.breakfast;
+    if (breakfast?.anchor_latlng) {
+      add({ id: 'meal-breakfast', latlng: breakfast.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">早</div>' });
+    }
+
+    const attractions = (day.attractions || []).filter(a => a.latlng);
+    const lunch = day.meals?.lunch;
+    const dinner = day.meals?.dinner;
+    const lunchInsertAt = attractions.length ? Math.max(0, Math.ceil(attractions.length / 2) - 1) : -1;
+
+    attractions.forEach((a, i) => {
+      add({
+        id: `attr-${i}`, latlng: a.latlng, kind: 'attraction',
+        pinHtml: `<div class="route-node-pin">${i + 1}</div>`,
+      });
+      if (lunch?.anchor_latlng && i === lunchInsertAt) {
+        add({ id: 'meal-lunch', latlng: lunch.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">午</div>' });
+      }
+    });
+
+    if (lunch?.anchor_latlng && !attractions.length) {
+      add({ id: 'meal-lunch', latlng: lunch.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">午</div>' });
+    }
+
+    if (dinner?.anchor_latlng) {
+      add({ id: 'meal-dinner', latlng: dinner.anchor_latlng, kind: 'meal', pinHtml: '<div class="seg-mid-pin">晚</div>' });
+    }
+
+    add({ id: 'stay-end', latlng: [...start], kind: 'stay', pinHtml: '<div class="route-node-pin is-last">返</div>' });
+    return stops;
+  },
+
+  drawDayRouteLoop(stops) {
+    const color = '#5B4E8A';
+    for (let i = 0; i < stops.length - 1; i++) {
+      const curve = this.generateGeodesicLinePoints(stops[i].latlng, stops[i + 1].latlng, 0.1);
+      this.addPolylineWithFlow(curve, color);
+    }
+  },
+
+  fitMapToStops(stops) {
+    if (!this.map || !stops.length) return;
+    const latlngs = stops.map(s => s.latlng);
+    if (latlngs.length === 1) {
+      this.map.setView(latlngs[0], 14, { animate: true });
+      return;
+    }
+    this.map.fitBounds(L.latLngBounds(latlngs).pad(0.06), {
+      paddingTopLeft: [20, 52],
+      paddingBottomRight: [20, 96],
+      maxZoom: 15,
+      animate: true,
+    });
+  },
+
+  prefetchDaysAround(dayNum) {
+    const total = parseInt(this.lastSearchPayload.days, 10) || 7;
+    [dayNum - 1, dayNum + 1, dayNum + 2].forEach((d) => {
+      if (d >= 1 && d <= total && !this.getCachedDay(d)) {
+        this.ensureDayLoaded(d).catch(() => {});
+      }
+    });
   },
 
   renderOverview(data) {
@@ -728,11 +810,12 @@ const MapEngine = {
   },
 
   openStayDetail(stay, dayNum) {
-    this.openSheet(`<span class="sheet-tag">住宿 · 第${dayNum}天</span>`, `
-      <h2 class="sheet-title">${escapeHtml(stay.name)}</h2>
+    this.openSheet(
+      <span className="sheet-tag">住宿 · 第{dayNum}天</span>,
+      `<h2 class="sheet-title">${escapeHtml(stay.name)}</h2>
       <p style="font-size:13px;line-height:1.6;margin-top:10px"><b>类型</b> ${escapeHtml(stay.type)}<br/><b>区域</b> ${escapeHtml(stay.area)}<br/><b>参考价</b> ${escapeHtml(stay.price_range)}</p>
-      <p style="font-size:12px;color:var(--ink2);margin-top:12px">当日子路线由此出发，单向游览不折返。</p>
-    `);
+      <p style="font-size:12px;color:var(--ink2);margin-top:12px">当日子路线由此出发，单向游览不折返。</p>`
+    );
   },
 
   openMealDetail(mealSlot, dayNum) {
@@ -753,44 +836,32 @@ const MapEngine = {
   },
 
   async renderDayMap(dayNum) {
-    this.renderStrip([{ id: 'loading', stripClass: 'node', typeLabel: '加载', title: `第${dayNum}天`, body: '推演当日行程…' }]);
+    const cached = this.getCachedDay(dayNum);
+    if (!cached) {
+      this.clearLayers();
+      this.renderStrip([{ id: 'loading', stripClass: 'node', typeLabel: '加载', title: `第${dayNum}天`, body: '推演当日行程…' }]);
+    }
+
     const day = await this.ensureDayLoaded(dayNum);
     if (!day) {
       this.renderStrip([{ id: 'err', stripClass: 'node', typeLabel: '提示', title: `第${dayNum}天`, body: this.lastDayDetailError || '暂无数据' }]);
       return;
     }
+
     this.closeSheet();
-    const items = this.buildDayStripItems(day, dayNum);
-    const points = [], routeLine = [];
-    let pinNum = 1;
-    if (day.day_start?.latlng) {
-      points.push(day.day_start.latlng); routeLine.push(day.day_start.latlng);
-      this.createPin(day.day_start.latlng, `<div class="route-node-pin is-first">${pinNum++}</div>`, 'stay', 900);
-    }
-    (day.attractions || []).forEach((a, i) => {
-      if (!a.latlng) return;
-      points.push(a.latlng); routeLine.push(a.latlng);
-      const pinClass = i === day.attractions.length - 1 ? ' is-last' : '';
-      this.createPin(a.latlng, `<div class="route-node-pin${pinClass}">${pinNum++}</div>`, `attr-${i}`, 850);
+    this.clearLayers();
+
+    const routeStops = this.buildDayRouteStops(day);
+    routeStops.forEach((stop) => {
+      const z = stop.kind === 'stay' ? 900 : stop.kind === 'meal' ? 700 : 850;
+      this.createPin(stop.latlng, stop.pinHtml, stop.id, z);
     });
-    if (routeLine.length > 1) {
-      const line = L.polyline(routeLine, { color: '#5B4E8A', weight: 4, opacity: 0.8 });
-      this.addLayer(line);
-    }
-    [{ key: 'breakfast', label: '早' }, { key: 'lunch', label: '午' }, { key: 'dinner', label: '晚' }].forEach(({ key, label }) => {
-      const slot = day.meals?.[key];
-      if (!slot?.anchor_latlng) return;
-      points.push(slot.anchor_latlng);
-      this.createPin(slot.anchor_latlng, `<div class="seg-mid-pin">${label}</div>`, `meal-${key}`, 700);
-    });
-    this.renderStrip(items);
-    if (points.length) {
-      this.map.fitBounds(L.latLngBounds(points).pad(0.15), {
-        ...this.mapFitPadding(),
-        maxZoom: 12,
-        animate: true,
-      });
-    }
+    if (routeStops.length > 1) this.drawDayRouteLoop(routeStops);
+
+    this.renderStrip(this.buildDayStripItems(day, dayNum));
+    this.fitMapToStops(routeStops);
+    this.prefetchDaysAround(dayNum);
+    setTimeout(() => this.map?.invalidateSize(), 80);
   },
 
   switchDay(dayNum) {
@@ -842,7 +913,11 @@ const MapEngine = {
     this.lastSearchPayload = payload;
     this.uiMode = 'overview';
     this.selectPlan(idx);
-    setTimeout(() => { this.initMap(); this.renderOverview(this.planOptions[idx]); }, 120);
+    setTimeout(() => {
+      this.initMap();
+      this.renderOverview(this.planOptions[idx]);
+      this.ensureDayLoaded(1).catch(() => {});
+    }, 120);
   },
 };
 
