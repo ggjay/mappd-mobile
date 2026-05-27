@@ -198,17 +198,35 @@
   }
   .nodes-carousel::-webkit-scrollbar { display: none; }
   .node-detail-card {
-    flex: 0 0 200px; scroll-snap-align: center;
+    flex: 0 0 min(280px, 78vw); scroll-snap-align: center;
     background: #fff; border: 2px solid var(--border); border-radius: 12px;
-    padding: 12px; cursor: pointer; min-height: 100px;
+    padding: 12px; cursor: pointer;
     transition: border-color 0.2s, box-shadow 0.2s;
     -webkit-tap-highlight-color: transparent;
   }
   .node-detail-card.active {
-    border-color: var(--accent); background: var(--accent-light);
+    border-color: var(--accent); background: linear-gradient(180deg, #fff 0%, var(--accent-light) 100%);
     box-shadow: 0 0 0 3px rgba(74, 91, 78, 0.2);
   }
   .node-detail-card .strip-type { margin-bottom: 4px; }
+  .node-detail-card .strip-title { margin-bottom: 8px; -webkit-line-clamp: unset; }
+  .node-detail-rows { display: flex; flex-direction: column; gap: 6px; }
+  .node-detail-row {
+    background: var(--bg); border-radius: 8px; padding: 8px 10px;
+    font-size: 11px; line-height: 1.45; color: var(--ink);
+    border-left: 3px solid var(--accent);
+  }
+  .node-detail-row.flight { border-left-color: #3B82F6; }
+  .node-detail-row.stay { border-left-color: var(--accent2); }
+  .node-detail-row.value { border-left-color: var(--ink3); }
+  .node-detail-row.segment { border-left-color: var(--accent); }
+  .node-detail-card.segment { border-left: 4px solid var(--accent); }
+  .node-detail-row .row-title {
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink2);
+    margin-bottom: 3px;
+  }
+  .node-detail-row .row-meta { font-size: 10px; color: var(--ink3); margin-top: 3px; }
   .cta-sticky-bar {
     flex-shrink: 0; padding: 10px 16px calc(10px + var(--safe-bottom));
     background: rgba(253, 251, 247, 0.96); border-top: 1px solid var(--border);
@@ -484,8 +502,7 @@ const MapEngine = {
     m.on('click', (e) => {
       L.DomEvent.stopPropagation(e);
       if (this.uiMode === 'overview') {
-        const item = this.overviewPinItems.find(i => i.id === stripCardId);
-        if (item?.onDetail) item.onDetail();
+        this.highlightStrip(stripCardId, true);
       } else {
         this.highlightStrip(stripCardId, false);
       }
@@ -516,56 +533,58 @@ const MapEngine = {
     this.openSheet(<span style={{ fontWeight: 700 }}>{title}</span>, html);
   },
 
-  buildNodeAnnotationHtml(node, idx, data) {
-    const parts = [];
+  buildNodeDetailBlocks(node, idx, data) {
+    const blocks = [];
+    const nCount = data.nodes?.length || 0;
     const outbound = data.roundtrip?.outbound;
     const ret = data.roundtrip?.return;
     const acc = this.getAccForNode(node, data.accommodation, idx);
     const startCity = this.lastSearchPayload.start_point || '';
+
+    if (node.core_value) {
+      blocks.push({ kind: 'value', title: '核心价值', text: node.core_value });
+    }
     if (idx === 0 && outbound?.method) {
-      const arriveHint = startCity && !outbound.method.includes(startCity) ? `${startCity} → ${node.city}` : outbound.method;
-      parts.push(`<div class="map-anno-card map-anno-flight"><div class="anno-title">抵达 · 去程</div><div>${escapeHtml(arriveHint)}</div><div class="anno-meta">${escapeHtml(outbound.duration || '')} ${outbound.price_ref ? '· ' + escapeHtml(outbound.price_ref) : ''}</div></div>`);
+      const arriveHint = startCity && !outbound.method.includes(startCity)
+        ? `${startCity} → ${node.city}` : outbound.method;
+      const meta = [outbound.duration, outbound.price_ref].filter(Boolean).join(' · ');
+      blocks.push({ kind: 'flight', title: '抵达 · 去程', text: arriveHint, meta });
     }
     if (acc || node.nights) {
-      parts.push(`<div class="map-anno-card map-anno-stay"><div class="anno-title">留宿 · ${escapeHtml(node.city)}</div><div>${acc ? `${escapeHtml(acc.nights_label || '')} ${node.nights}晚` : `${node.nights} 晚`}</div><div class="anno-meta">${escapeHtml(acc?.price_range || '')}</div></div>`);
+      const stayText = acc
+        ? `${acc.nights_label || ''} ${node.nights}晚 · ${acc.type || ''}`.trim()
+        : `${node.nights} 晚`;
+      const meta = [acc?.price_range, acc?.location && !this.cityMatch(acc.location, node.city) ? acc.location : ''].filter(Boolean).join(' · ');
+      blocks.push({ kind: 'stay', title: `留宿 · ${node.city}`, text: stayText, meta });
     }
-    if (idx === (data.nodes?.length || 0) - 1 && ret?.method) {
-      parts.push(`<div class="map-anno-card map-anno-flight"><div class="anno-title">返程</div><div>${escapeHtml(ret.method)}</div><div class="anno-meta">${escapeHtml(ret.duration || '')}</div></div>`);
+    if (idx === nCount - 1 && ret?.method) {
+      const meta = [ret.duration, ret.price_ref].filter(Boolean).join(' · ');
+      blocks.push({ kind: 'flight', title: '返程', text: ret.method, meta });
     }
-    return parts.length ? `<div class="map-anno-wrap">${parts.join('')}</div>` : '';
+    return blocks;
   },
 
-  buildSegmentAnnotationHtml(seg) {
-    if (!seg) return '<p style="font-size:12px;color:var(--ink2)">暂无转场信息</p>';
-    return `<div class="map-anno-wrap"><div class="map-anno-card map-anno-segment"><div class="anno-title">城际转场</div><div>${escapeHtml(seg.method || '接驳')}</div><div class="anno-meta">${escapeHtml(seg.reason || '')}</div></div></div>`;
+  buildSegmentDetailBlocks(seg) {
+    if (!seg) return [{ kind: 'segment', title: '城际转场', text: '接驳推演中' }];
+    const text = `${seg.method || '接驳'}${seg.self_drive_rec ? ' · 推荐自驾' : ''}`;
+    return [{ kind: 'segment', title: '城际转场', text, meta: seg.reason || '' }];
   },
 
   buildOverviewStripItems(data) {
     const items = [];
     const nodes = data.nodes || [];
     nodes.forEach((n, idx) => {
-      const acc = this.getAccForNode(n, data.accommodation, idx);
-      const outbound = data.roundtrip?.outbound;
-      const ret = data.roundtrip?.return;
-      const startCity = this.lastSearchPayload.start_point || '';
-      const bodyParts = [];
-      if (idx === 0 && outbound?.method) bodyParts.push(`去程 ${startCity && !outbound.method.includes(startCity) ? startCity + '→' + n.city : outbound.method}`);
-      if (acc || n.nights) bodyParts.push(`留宿 ${n.nights}晚`);
-      if (idx === nodes.length - 1 && ret?.method) bodyParts.push(`返程 ${ret.method}`);
+      const details = this.buildNodeDetailBlocks(n, idx, data);
       items.push({
         id: `node-${idx}`, stripClass: 'node', typeLabel: `节点 ${idx + 1}`,
-        title: n.city, body: bodyParts.join(' · ') || n.core_value || '',
-        latlng: n.latlng,
-        onDetail: () => this.showRoutePopup(`${idx + 1}. ${n.city}`, this.buildNodeAnnotationHtml(n, idx, data)),
+        title: n.city, body: '', details, latlng: n.latlng,
       });
       if (idx < nodes.length - 1) {
         const seg = this.getSegmentBetween(n.city, nodes[idx + 1].city, data.segment_transport);
         items.push({
           id: `seg-${idx}`, stripClass: 'segment', typeLabel: '城际转场',
           title: `${n.city} → ${nodes[idx + 1].city}`,
-          body: seg ? `${seg.method}${seg.self_drive_rec ? ' · 自驾' : ''}` : '接驳推演中',
-          latlng: null,
-          onDetail: () => seg && this.showRoutePopup(`${seg.from} → ${seg.to}`, this.buildSegmentAnnotationHtml(seg)),
+          body: '', details: this.buildSegmentDetailBlocks(seg), latlng: null,
         });
       }
     });
@@ -631,8 +650,7 @@ const MapEngine = {
         animate: true,
       });
     }
-    const nodeItems = this.overviewPinItems.filter(i => i.stripClass === 'node');
-    this.ui?.setOverviewNodes?.(nodeItems);
+    this.ui?.setOverviewNodes?.(this.overviewPinItems);
     setTimeout(() => this.map?.invalidateSize(), 80);
   },
 
@@ -901,6 +919,28 @@ function WelcomeScreen({ form, setForm, onSubmit, loading }) {
   );
 }
 
+function NodeDetailCard({ item, active, onSelect }) {
+  return (
+    <div
+      data-strip-id={item.id}
+      className={`node-detail-card ${item.stripClass || 'node'} ${active ? 'active' : ''}`}
+      onClick={() => onSelect(item.id)}
+    >
+      <div className="strip-type">{item.typeLabel}</div>
+      <div className="strip-title">{item.title}</div>
+      <div className="node-detail-rows">
+        {(item.details || []).map((block, i) => (
+          <div key={i} className={`node-detail-row ${block.kind}`}>
+            <div className="row-title">{block.title}</div>
+            <div>{block.text}</div>
+            {block.meta ? <div className="row-meta">{block.meta}</div> : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PlanCard({ plan, idx, selected, onSelect }) {
   const ce = plan.cost_estimate || {};
   const tags = (plan.experience_tags || []).slice(0, 3);
@@ -1034,19 +1074,12 @@ function TripShell({ page, plans, selectedIdx, onSelectPlan, onBackToWelcome, on
                 <div className="panel-hint">上滑至此 · 节点详情 · 左右滑动</div>
                 <div className="nodes-carousel" ref={nodesRef} onScroll={onNodeCarouselScroll}>
                   {overviewNodes.map(item => (
-                    <div
+                    <NodeDetailCard
                       key={item.id}
-                      data-strip-id={item.id}
-                      className={`node-detail-card ${item.id === activeStripId ? 'active' : ''}`}
-                      onClick={() => {
-                        MapEngine.highlightStrip(item.id, true);
-                        if (item.onDetail) item.onDetail();
-                      }}
-                    >
-                      <div className="strip-type">{item.typeLabel}</div>
-                      <div className="strip-title">{item.title}</div>
-                      <div className="strip-body">{item.body}</div>
-                    </div>
+                      item={item}
+                      active={item.id === activeStripId}
+                      onSelect={(id) => MapEngine.highlightStrip(id, true)}
+                    />
                   ))}
                 </div>
               </div>
